@@ -33,7 +33,7 @@
       }
     ]
   },
-  "onboarded": false,
+  "onboarded": true,
   "view": "messages",
   "chatId": null,
   "skipped": [],
@@ -130,7 +130,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787364332708,
+  "updatedAt": 1787364334271,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
