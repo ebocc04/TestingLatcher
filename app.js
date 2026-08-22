@@ -1057,12 +1057,34 @@ async function fetchPageText(url) {
   );
 }
 
+async function pullViaDebugChrome(pageUrl) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 70000);
+  try {
+    const res = await fetch(`http://127.0.0.1:7843/grab?url=${encodeURIComponent(pageUrl)}`, { signal: ctrl.signal });
+    const body = await res.text();
+    if (!res.ok) throw new Error(body || `${res.status}`);
+    const got = JSON.parse(body);
+    if (got.login) throw new Error("Log into Instagram in the debug Chrome window, then hit Grab again.");
+    if (got.photos && got.photos.length) return got.photos;
+    throw new Error("Debug Chrome opened but found no photos.");
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function pullInstagramPhotos(input) {
   const parsed = parseInstagram(input);
   if (!parsed) throw new Error("Paste an Instagram profile, post, or a photo URL.");
   if (parsed.kind === "image") {
     const data = await latchStorage.compressImageUrl(parsed.url);
     return { handle: "", photos: [data] };
+  }
+  try {
+    const chromePhotos = await pullViaDebugChrome(parsed.page);
+    return { handle: parsed.handle || "", photos: chromePhotos };
+  } catch (err) {
+    if (/Log into Instagram/.test(err.message || "")) throw err;
   }
   const photos = [];
   const pic = await avatarFromHandle(parsed.handle);
@@ -1149,7 +1171,7 @@ function openAddProfile() {
         <strong>Add a profile</strong>
       </div>
       <div class="sheet-scroll admin-form">
-        <p class="muted">A profile link usually 403s — Instagram won't let a website read the grid. Grab still fills the name and tries the public profile photo. Upload the rest, or paste image addresses.</p>
+        <p class="muted">Grab opens a debug Chrome window and reads the photos from the live page, so Instagram's login wall doesn't 403 the fetch. Run <b>tools/ig-grab.ps1</b> once on this computer, log into Instagram in that Chrome, then hit Grab. Otherwise upload shots.</p>
         <label>Instagram
           <input id="add-ig" value="${esc(draft.instagram)}" placeholder="https://instagram.com/name or a post link" />
         </label>
