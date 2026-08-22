@@ -679,7 +679,7 @@ function llmFieldsHtml() {
   const models = llmFieldsHtml.models || spec.curated.concat(cfg.model).filter((v, i, a) => a.indexOf(v) === i);
   return `<div class="prompt-card">
     <p class="q">Chat engine</p>
-    <p class="muted" style="margin:0 0 12px">Phones stay on the 1B model so the tab lives. We prompt it like a person texting — the desktop rulebook made Llama Instruct sound like a help desk. Computers still get Hermes. Chrome/Edge; some iPhones still lack WebGPU.</p>
+    <p class="muted" style="margin:0 0 12px">Phones load Qwen 1.5B so the tab lives — first download is about 1GB. If that runs out of memory it falls back to Llama 1B. Computers still get Hermes. Chrome/Edge; some iPhones still lack WebGPU.</p>
     <label class="stack">Provider
       <select class="field" id="llm-provider">
         <option value="local" ${cfg.provider === "local" ? "selected" : ""}>On this device — free, no key</option>
@@ -1648,7 +1648,7 @@ async function queueBotReply(id, userText) {
     llmProgress =
       latchLLM.config().provider === "local"
         ? latchLLM.isTightDevice()
-          ? "Loading the phone model…"
+          ? "Loading Qwen 1.5B on this phone…"
           : "Loading Hermes on this device…"
         : "Thinking…";
     render();

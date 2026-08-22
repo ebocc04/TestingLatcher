@@ -31,7 +31,7 @@ Two engines. With an API key, replies come from a language model that reads the 
 
 Nothing here requires payment.
 
-- **On this device** (recommended if you want unfiltered and $0): downloads Hermes 3 (~2GB, once) into Chrome/Edge via WebGPU. No key. iPhone Safari cannot run it.
+- **On this device** (recommended if you want unfiltered and $0): computers download Hermes 3 (~2GB, once); phones download Qwen 1.5B and fall back to Llama 1B if they run out of memory. Chrome/Edge via WebGPU. No key. Some iPhones still cannot run it.
 - **OpenRouter free**: a free account and the `openrouter/free` router. No credits. Those models may still refuse some flirty turns.
 - **Groq**: free and fast, but refuses flirty / sexual dating chat. That filter cannot be turned off.
 

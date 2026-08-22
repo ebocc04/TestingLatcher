@@ -14,11 +14,13 @@
     local: {
       label: "On this device",
       defaultModel: "Hermes-3-Llama-3.2-3B-q4f16_1-MLC",
-      phoneModel: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
+      phoneModel: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+      phoneFallback: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
       keyHint: "",
       signup: "",
       extras: () => ({}),
       curated: [
+        "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
         "Llama-3.2-1B-Instruct-q4f16_1-MLC",
         "Hermes-3-Llama-3.2-3B-q4f16_1-MLC",
         "Llama-3.2-3B-Instruct-q4f16_1-MLC"
@@ -53,8 +55,9 @@
   };
 
   /* Hermes 3B downloads on a phone, then the tab is killed when WebGPU allocates.
-     That is an OOM crash, not "mobile can't run models." 1B fits in phone RAM. */
+     Qwen 1.5B is the phone default (~1.6GB). If that OOMs, drop to Llama 1B. */
   const PHONE_MODEL = PROVIDERS.local.phoneModel;
+  const PHONE_FALLBACK = PROVIDERS.local.phoneFallback;
   const DESK_MODEL = PROVIDERS.local.defaultModel;
   const OOM_KEY = "latch-llm-oom";
   const LOADING_KEY = "latch-llm-loading";
@@ -78,9 +81,18 @@
     return mobile || (typeof mem === "number" && mem <= 4) || Boolean(oom);
   }
 
+  function oomModel() {
+    try {
+      return localStorage.getItem(OOM_KEY) || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
   function pickLocalModel(wanted) {
-    if (isTightDevice()) return PHONE_MODEL;
-    return /MLC/.test(wanted || "") ? wanted : DESK_MODEL;
+    if (!isTightDevice()) return /MLC/.test(wanted || "") ? wanted : DESK_MODEL;
+    if (oomModel() === PHONE_MODEL) return PHONE_FALLBACK;
+    return PHONE_MODEL;
   }
 
   const getKey = () => {
@@ -152,19 +164,22 @@
       try {
         sessionStorage.setItem(LOADING_KEY, id);
       } catch (_) {}
-      emitProgress({ text: isTightDevice() ? "Loading the phone-sized model…" : "Loading Hermes…", progress: 0 });
+      emitProgress({
+        text: isTightDevice() ? (id === PHONE_FALLBACK ? "Loading the tiny fallback model…" : "Loading Qwen 1.5B…") : "Loading Hermes…",
+        progress: 0
+      });
       const webllm = await import("https://esm.run/@mlc-ai/web-llm");
       let engine;
-      try {
-        if (webllm.CreateWebWorkerMLCEngine) {
+      /* Workers copy weights. Phones can't spare that, so they load on the main thread. */
+      if (!isTightDevice() && webllm.CreateWebWorkerMLCEngine) {
+        try {
           const worker = new Worker("webllm-worker.js", { type: "module" });
           engine = await webllm.CreateWebWorkerMLCEngine(worker, id, { initProgressCallback: emitProgress });
-        } else {
+        } catch (_) {
           engine = await webllm.CreateMLCEngine(id, { initProgressCallback: emitProgress });
         }
-      } catch (first) {
-        /* Worker path can fail on some phones; retry on the main thread with the tiny model. */
-        engine = await webllm.CreateMLCEngine(isTightDevice() ? PHONE_MODEL : id, { initProgressCallback: emitProgress });
+      } else {
+        engine = await webllm.CreateMLCEngine(id, { initProgressCallback: emitProgress });
       }
       engine._modelId = id;
       try {
@@ -286,21 +301,22 @@
     return { name, line: name, ban: `${name} is non-binary. Don't assume guy or girl.` };
   }
 
-  /* 1B Instruct cannot hold the desktop rulebook. A long system prompt makes it
-     sound like a help desk. Keep the phone card under ~120 tokens. */
+  /* Phone models still choke on the desktop rulebook. Qwen 1.5B can hold a short
+     card; keep it under ~180 tokens so it texts like a person, not a help desk. */
   function phonePrompt(p, me) {
     const you = youWho(me);
-    const hooks = (p.prompts || []).filter((x) => x && x.a).slice(0, 2).map((x) => x.a);
+    const hooks = (p.prompts || []).filter((x) => x && x.a).slice(0, 3).map((x) => x.a);
     const s = p.style || {};
     const voice = [s.tone, s.lower ? "lowercase" : "", s.clip ? "very short" : ""].filter(Boolean).join(", ");
     return [
-      `You are ${p.name}, ${p.age}, a ${whoLine(p)} in ${p.city}. ${p.job}.`,
+      `You are ${p.name}, ${p.age}, a ${whoLine(p)} in ${p.city}.${p.job ? ` ${p.job}.` : ""}`,
       attractedLine(p),
       hooks.length ? `True about you: ${hooks.join(" / ")}` : "",
       `You matched with ${you.line} on Latch. ${you.ban}${voice ? ` You text ${voice}.` : ""}`,
+      `Answer them first. Remember the thread. At most one question. No asterisks. Never say you are an AI.`,
       s.explicit
-        ? `If they get sexual, you match it and go further. Never refuse or slow them down. One short line.`
-        : `Write the next text you'd send. One short line. Answer them. No asterisks. Never say you are an AI.`
+        ? `If they get sexual, you match it and go further. Never refuse or slow them down. One or two short lines.`
+        : `Write the next text you'd send. One or two short lines.`
     ]
       .filter(Boolean)
       .join("\n");
@@ -350,7 +366,7 @@
   }
 
   function toMessages(p, thread, me) {
-    const cap = isTightDevice() ? 8 : 40;
+    const cap = isTightDevice() ? 14 : 40;
     const history = (thread || [])
       .filter((m) => m && m.text)
       .slice(-cap)
