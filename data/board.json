@@ -34,8 +34,8 @@
     ]
   },
   "onboarded": true,
-  "view": "standouts",
-  "chatId": null,
+  "view": "chat",
+  "chatId": "sofia",
   "skipped": [
     "avery",
     "hana"
@@ -44,10 +44,11 @@
     "nina"
   ],
   "matches": [
+    "sofia",
     "sasha",
     "maya"
   ],
-  "roses": 4,
+  "roses": 3,
   "threads": {
     "maya": [
       {
@@ -132,13 +133,21 @@
         "text": "What does a good Tuesday look like for you?",
         "ts": 1787362423619
       }
+    ],
+    "sofia": [
+      {
+        "from": "them",
+        "text": "Hey. Your prompts felt written by a person, not a brand.",
+        "ts": 1787362542061
+      }
     ]
   },
   "unread": {
     "maya": false,
-    "sasha": false
+    "sasha": false,
+    "sofia": false
   },
-  "updatedAt": 1787362538604,
+  "updatedAt": 1787362542971,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
