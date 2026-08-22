@@ -1023,15 +1023,9 @@ function skip(id) {
 }
 
 function likePerson(id, note) {
-  const p = profileById(id);
   if (!state.liked.includes(id)) state.liked.push(id);
-  const willMatch = p.likesYou || Math.random() < 0.45 || Boolean(note);
   save();
-  if (willMatch) matchNow(id, note ? "They liked your comment" : "It's a match", note);
-  else {
-    toast(`Liked ${p.name}`);
-    render();
-  }
+  matchNow(id, note ? "They liked your comment" : "It's a match", note);
 }
 
 function sendRose(id) {
