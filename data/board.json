@@ -88,6 +88,12 @@
         "from": "me",
         "text": "Oh a date invite huh? I’m more into the… spicy dates",
         "ts": 1787369590028
+      },
+      {
+        "from": "them",
+        "text": "Spicy, huh? I’ve got a recipe for that. Saturday, 3 pm, the taco spot on 6th?",
+        "ts": 1787369593576,
+        "via": "groq"
       }
     ]
   },
@@ -120,7 +126,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369590933,
+  "updatedAt": 1787369594486,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
