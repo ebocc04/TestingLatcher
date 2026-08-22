@@ -29,9 +29,11 @@ Two engines. With an API key, replies come from a language model that reads the 
 
 ### Language model (recommended)
 
-**Use OpenRouter, not Groq, if you want flirty / sexual dating chat.** Groq's hosted models refuse those turns (`I can't help with that`). That is their safety filter and Latch cannot disable it. OpenRouter can route to uncensored models (default: Venice Uncensored / Dolphin).
+Nothing here requires payment.
 
-Profile → **Chat engine** → pick OpenRouter → paste a [key](https://openrouter.ai/keys) → **Connect**. Both APIs send CORS headers, so this static site calls them directly. The key is stored in `localStorage` only — never in `board.json`.
+- **On this device** (recommended if you want unfiltered and $0): downloads Hermes 3 (~2GB, once) into Chrome/Edge via WebGPU. No key. iPhone Safari cannot run it.
+- **OpenRouter free**: a free account and the `openrouter/free` router. No credits. Those models may still refuse some flirty turns.
+- **Groq**: free and fast, but refuses flirty / sexual dating chat. That filter cannot be turned off.
 
 If a model returns a refusal, Latch throws it away instead of showing it as the match. Switch models if that happens.
 

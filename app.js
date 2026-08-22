@@ -533,7 +533,9 @@ function renderChat(root) {
   }
   const msgs = state.threads[p.id] || [];
   const live = window.latchLLM && latchLLM.active();
-  const engineName = live ? (latchLLM.config().provider === "openrouter" ? "OpenRouter" : "Groq") : "Built-in";
+  const engineName = live
+    ? { local: "On-device", openrouter: "OpenRouter", groq: "Groq" }[latchLLM.config().provider] || "Model"
+    : "Built-in";
   $("page-title").textContent = p.name;
   $("page-sub").textContent = `Active now · ${engineName}`;
   root.innerHTML = `
@@ -603,24 +605,29 @@ function llmFieldsHtml() {
   const models = llmFieldsHtml.models || spec.curated.concat(cfg.model).filter((v, i, a) => a.indexOf(v) === i);
   return `<div class="prompt-card">
     <p class="q">Chat engine</p>
-    <p class="muted" style="margin:0 0 12px"><b>Groq refuses flirty / sexual texts</b> — that's their filter, not Latch. Use <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">OpenRouter</a> with Venice Uncensored if you want replies like a real match. The key stays in this browser and is never saved to your board.</p>
+    <p class="muted" style="margin:0 0 12px">Nothing here costs money. <b>On this device</b> downloads Hermes (~2GB, once) and runs in Chrome/Edge — no key. <b>OpenRouter free</b> needs only a free account, no credits. Groq is also free but refuses flirty chat.</p>
     <label class="stack">Provider
       <select class="field" id="llm-provider">
-        <option value="openrouter" ${cfg.provider === "openrouter" ? "selected" : ""}>OpenRouter — unfiltered dating chat</option>
-        <option value="groq" ${cfg.provider === "groq" ? "selected" : ""}>Groq — fast, refuses flirty chat</option>
+        <option value="local" ${cfg.provider === "local" ? "selected" : ""}>On this device — free, no key</option>
+        <option value="openrouter" ${cfg.provider === "openrouter" ? "selected" : ""}>OpenRouter free models — free account, no credits</option>
+        <option value="groq" ${cfg.provider === "groq" ? "selected" : ""}>Groq — free, refuses flirty chat</option>
       </select>
     </label>
-    <label class="stack" style="margin-top:10px">${esc(spec.label)} API key
+    ${
+      cfg.provider === "local"
+        ? ""
+        : `<label class="stack" style="margin-top:10px">${esc(spec.label)} API key
       <input class="field" type="password" id="llm-key" value="${esc(key)}" placeholder="${esc(spec.keyHint)}" autocomplete="off" />
-    </label>
+    </label>`
+    }
     <label class="stack" style="margin-top:10px">Model
       <select class="field" id="llm-model">${models
         .map((m) => `<option value="${esc(m)}" ${m === cfg.model ? "selected" : ""}>${esc(m)}</option>`)
         .join("")}</select>
     </label>
-    <label class="check" style="margin-top:10px"><input type="checkbox" id="llm-off" ${on || !key ? "" : "checked"} /> use built-in replies instead</label>
+    <label class="check" style="margin-top:10px"><input type="checkbox" id="llm-off" ${on ? "" : "checked"} /> use built-in replies instead</label>
     <p class="muted" data-llm-status style="margin:8px 0 0">${
-      on ? `Live — ${esc(cfg.model)}` : key ? "Off — using built-in replies" : "No key — using built-in replies"
+      on ? `Live — ${esc(cfg.model)}` : "Off — using built-in replies"
     }</p>
     <div class="row" style="justify-content:flex-start;margin-top:12px">
       <button type="button" class="btn-primary" id="llm-connect">Connect</button>
@@ -653,24 +660,36 @@ function bindLlm(root) {
     setLlmStatus(`Live — ${modelEl.value}`);
   });
   root.querySelector("#llm-connect")?.addEventListener("click", async () => {
-    if (provEl) latchLLM.setConfig({ provider: provEl.value });
-    latchLLM.setKey(keyEl.value);
-    if (!keyEl.value.trim()) {
-      setLlmStatus("Key cleared — using built-in replies");
-      return;
+    const provider = provEl ? provEl.value : latchLLM.config().provider;
+    latchLLM.setConfig({ provider, enabled: true });
+    if (provider !== "local") {
+      if (!keyEl || !keyEl.value.trim()) {
+        setLlmStatus("Paste a free API key, or switch to On this device.");
+        return;
+      }
+      latchLLM.setKey(keyEl.value);
     }
-    setLlmStatus("Checking key…");
+    setLlmStatus(provider === "local" ? "Downloading the model… first time is a couple GB." : "Checking key…");
+    const stop = latchLLM.onProgress((text) => setLlmStatus(text || "Loading…"));
     try {
-      const models = await latchLLM.listModels();
-      llmFieldsHtml.models = models;
-      const cfg = latchLLM.config();
-      const fallback = latchLLM.DEFAULT_MODEL;
-      const model = models.includes(cfg.model) ? cfg.model : models.includes(fallback) ? fallback : models[0];
-      latchLLM.setConfig({ model, enabled: true });
-      toast(`Chat model connected — ${model}`);
+      if (provider === "local") {
+        await latchLLM.ensureLocal();
+        latchLLM.setConfig({ localReady: true, enabled: true });
+        toast("On-device model ready");
+      } else {
+        const models = await latchLLM.listModels();
+        llmFieldsHtml.models = models;
+        const cfg = latchLLM.config();
+        const fallback = latchLLM.DEFAULT_MODEL;
+        const model = models.includes(cfg.model) ? cfg.model : models.includes(fallback) ? fallback : models[0];
+        latchLLM.setConfig({ model, enabled: true });
+        toast(`Chat model connected — ${model}`);
+      }
       renderProfile();
     } catch (err) {
       setLlmStatus(err.message);
+    } finally {
+      stop();
     }
   });
   root.querySelector("#llm-test")?.addEventListener("click", async () => {

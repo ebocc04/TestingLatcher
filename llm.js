@@ -11,22 +11,29 @@
   const CFG = "latch-llm-cfg";
 
   const PROVIDERS = {
+    local: {
+      label: "On this device",
+      defaultModel: "Hermes-3-Llama-3.2-3B-q4f16_1-MLC",
+      keyHint: "",
+      signup: "",
+      extras: () => ({}),
+      curated: [
+        "Hermes-3-Llama-3.2-3B-q4f16_1-MLC",
+        "Llama-3.2-3B-Instruct-q4f16_1-MLC",
+        "Llama-3.2-1B-Instruct-q4f16_1-MLC"
+      ]
+    },
     openrouter: {
-      label: "OpenRouter",
+      label: "OpenRouter (free models)",
       base: "https://openrouter.ai/api/v1",
-      defaultModel: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+      defaultModel: "openrouter/free",
       keyHint: "sk-or-…",
       signup: "https://openrouter.ai/keys",
       extras: () => ({
         "HTTP-Referer": location.origin,
         "X-Title": "Latch"
       }),
-      curated: [
-        "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
-        "nousresearch/hermes-3-llama-3.1-70b",
-        "sao10k/l3-8b-lunaris",
-        "neversleep/llama-3-lumimaid-8b"
-      ]
+      curated: ["openrouter/free", "openai/gpt-oss-20b:free", "google/gemma-4-26b-a4b-it:free"]
     },
     groq: {
       label: "Groq",
@@ -42,7 +49,8 @@
   const inferProvider = (key, saved) => {
     if (saved && PROVIDERS[saved]) return saved;
     if (/^gsk_/i.test(key || "")) return "groq";
-    return "openrouter";
+    if (/^sk-or-/i.test(key || "")) return "openrouter";
+    return "local";
   };
 
   const getKey = () => {
@@ -69,10 +77,11 @@
     const provider = inferProvider(key, saved.provider);
     const spec = PROVIDERS[provider];
     let model = saved.model || spec.defaultModel;
-    if (provider === "openrouter" && /^(openai\/gpt-oss|llama-)/i.test(model)) model = spec.defaultModel;
+    if (provider === "openrouter" && /dolphin|lunaris|lumimaid|hermes-3-llama-3\.1-70b/i.test(model)) model = spec.defaultModel;
     if (provider === "groq" && !/^(openai\/|llama|meta-llama|qwen)/i.test(model) && model.includes("/")) {
       if (!model.startsWith("openai/")) model = spec.defaultModel;
     }
+    if (provider === "local" && !/MLC/.test(model)) model = spec.defaultModel;
     return { enabled: true, ...saved, provider, model };
   }
 
@@ -84,8 +93,45 @@
     return next;
   }
 
-  const active = () => Boolean(getKey()) && config().enabled !== false;
-  const spec = () => PROVIDERS[config().provider] || PROVIDERS.openrouter;
+  const active = () => {
+    const c = config();
+    if (c.enabled === false) return false;
+    if (c.provider === "local") return Boolean(c.localReady);
+    return Boolean(getKey());
+  };
+  const spec = () => PROVIDERS[config().provider] || PROVIDERS.local;
+
+  let localEngine = null;
+  let localLoading = null;
+  let lastProgress = "";
+  const progressFns = new Set();
+  const onProgress = (fn) => {
+    progressFns.add(fn);
+    return () => progressFns.delete(fn);
+  };
+  const emitProgress = (report) => {
+    lastProgress = (report && (report.text || `${Math.round((report.progress || 0) * 100)}%`)) || "";
+    progressFns.forEach((fn) => fn(lastProgress, report));
+  };
+
+  async function ensureLocal(modelId) {
+    const id = modelId || config().model;
+    if (localEngine && localEngine._modelId === id) return localEngine;
+    if (localLoading) return localLoading;
+    if (!navigator.gpu) throw new Error("This browser has no WebGPU. Use Chrome or Edge on a computer — iPhone Safari can't run the free on-device model.");
+    localLoading = (async () => {
+      const webllm = await import("https://esm.run/@mlc-ai/web-llm");
+      const engine = await webllm.CreateMLCEngine(id, { initProgressCallback: emitProgress });
+      engine._modelId = id;
+      localEngine = engine;
+      localLoading = null;
+      return engine;
+    })().catch((err) => {
+      localLoading = null;
+      throw err;
+    });
+    return localLoading;
+  }
 
   async function call(path, opts = {}) {
     const key = getKey();
@@ -116,6 +162,7 @@
   }
 
   async function listModels() {
+    if (config().provider === "local") return PROVIDERS.local.curated;
     const data = await call("/models");
     const ids = (data.data || []).map((m) => m.id).filter((id) => !/whisper|orpheus|guard|tts|embed/i.test(id));
     const curated = spec().curated.filter((id) => ids.includes(id) || true);
@@ -257,6 +304,19 @@
   async function reply(p, thread, me) {
     if (!active()) return null;
     const messages = toMessages(p, thread, me);
+    if (config().provider === "local") {
+      const engine = await ensureLocal();
+      const data = await engine.chat.completions.create({
+        messages,
+        temperature: 0.95,
+        max_tokens: 160
+      });
+      const { text } = extractText(data);
+      if (isRefusal(text)) throw new Error("On-device model refused. Try Hermes if you were on Llama Instruct.");
+      const lines = toLines(text);
+      if (!lines.length) throw new Error("Empty reply from the on-device model.");
+      return lines;
+    }
     const budget = config().provider === "groq" ? 1024 : 220;
     let data = await complete(messages, budget);
     let { text, finish } = extractText(data);
@@ -287,6 +347,8 @@
     listModels,
     reply,
     systemPrompt,
+    ensureLocal,
+    onProgress,
     providers: PROVIDERS,
     get DEFAULT_MODEL() {
       return spec().defaultModel;
