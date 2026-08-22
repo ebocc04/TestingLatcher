@@ -3,7 +3,7 @@
     "name": "Skylar",
     "age": 22,
     "gender": "women",
-    "orientation": "",
+    "orientation": "straight",
     "city": "Austin",
     "seeking": "women",
     "job": "",
@@ -130,7 +130,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787364033945,
+  "updatedAt": 1787364332708,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
