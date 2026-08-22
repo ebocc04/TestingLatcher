@@ -6,7 +6,7 @@ Open `index.html`, or host the folder on **GitHub Pages**.
 
 Local preview: `powershell -ExecutionPolicy Bypass -File tools/serve.ps1` → http://localhost:8765/
 
-> Bump the `?v=` on the `<script>` and `<link>` tags in `index.html` whenever you deploy. GitHub Pages caches assets for ten minutes and stale JS looks exactly like a broken app.
+> Bump `LATCH_BUILD`, the `#build-no` label, and every `?v=` in `index.html` on deploy. GitHub Pages caches assets for ten minutes; the number in the top-right is how you know the new copy loaded.
 
 ## First-run setup
 
