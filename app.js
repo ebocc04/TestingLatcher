@@ -152,30 +152,30 @@ function toast(msg) {
   toast._t = setTimeout(() => el.classList.add("hidden"), 2400);
 }
 
-async function syncToGithub() {
+async function syncToGithubNow() {
   const g = state.github;
-  if (!latchStorage.getToken() || !g.owner || !g.repo) return;
-  if (ghBusy) {
-    syncToGithub.again = true;
-    return;
-  }
+  if (!latchStorage.getToken() || !g.owner || !g.repo) return null;
   ghBusy = true;
-  setGhStatus("Saving photos…");
+  setGhStatus("Saving…");
   try {
     await latchStorage.offloadPhotos(state, g);
     const sha = await latchStorage.pushBoard(g, boardPayload(), g.sha);
     if (sha) state.github.sha = sha;
     latchStorage.writeLocal(state);
-    setGhStatus("Saved to GitHub");
+    setGhStatus("Board sync on");
+    return sha;
   } catch (err) {
     setGhStatus(err.message);
+    throw err;
   } finally {
     ghBusy = false;
-    if (syncToGithub.again) {
-      syncToGithub.again = false;
-      syncToGithub().catch(() => {});
-    }
   }
+}
+
+function syncToGithub() {
+  const run = () => syncToGithubNow();
+  syncToGithub.chain = (syncToGithub.chain || Promise.resolve()).then(run, run);
+  return syncToGithub.chain;
 }
 
 async function loadFromGithub() {
@@ -216,7 +216,7 @@ function setGhStatus(text) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function canUseBrain() {
-  return Boolean(latchStorage.getToken() && state.github && state.github.owner && latchLLM.isTightDevice());
+  return Boolean(latchStorage.getToken() && state.github && state.github.owner && latchLLM.deviceRole() === "phone");
 }
 
 async function pushBrainPatch(reply) {
@@ -245,17 +245,27 @@ async function askDesktopBrain(p, thread) {
   };
   state.brainReply = null;
   save({ skipRemote: true });
+  llmProgress = "Sending to Hermes host…";
+  render();
   await syncToGithub();
+  const posted = await latchStorage.pullBoard(state.github);
+  if (!posted || !posted.data || !posted.data.brainJob || posted.data.brainJob.id !== jobId) {
+    throw new Error("Board sync didn't send the chat. Check the token on both devices.");
+  }
   const deadline = Date.now() + 180000;
   while (Date.now() < deadline) {
-    await sleep(2500);
+    await sleep(1500);
     const remote = await latchStorage.pullBoard(state.github);
     if (!remote || !remote.data) continue;
     if (remote.sha) state.github.sha = remote.sha;
     const reply = remote.data.brainReply;
-    if (!reply || reply.id !== jobId) continue;
+    if (!reply || reply.id !== jobId) {
+      llmProgress = "Waiting for Hermes host… leave Latch open on the computer.";
+      render();
+      continue;
+    }
     if (reply.status === "loading") {
-      llmProgress = reply.text || "Hermes host is loading…";
+      llmProgress = reply.text || "Hermes host is writing…";
       render();
       continue;
     }
@@ -272,41 +282,63 @@ async function askDesktopBrain(p, thread) {
 
 let brainWorking = false;
 
+function jobPerson(job, remoteData) {
+  return (
+    profileById(job.profileId) ||
+    ((remoteData && remoteData.customProfiles) || []).find((x) => x.id === job.profileId) ||
+    (window.LATCH_PROFILES || []).find((x) => x.id === job.profileId) ||
+    null
+  );
+}
+
 async function processBrainJob() {
-  if (brainWorking || latchLLM.isTightDevice() || !latchStorage.getToken()) return;
-  if (!window.latchLLM || !latchLLM.active() || latchLLM.config().provider !== "local") return;
+  if (brainWorking || latchLLM.deviceRole() !== "host" || !latchStorage.getToken()) return;
+  if (!window.latchLLM || !latchLLM.active() || latchLLM.config().provider !== "local") {
+    setLlmStatus("Hermes host is off. Tap Start Hermes host.");
+    return;
+  }
   const remote = await latchStorage.pullBoard(state.github);
-  if (!remote || !remote.data || !remote.data.brainJob || !remote.data.brainJob.id) return;
+  if (!remote || !remote.data || !remote.data.brainJob || !remote.data.brainJob.id) {
+    setLlmStatus("Hermes host is watching for Phone link…");
+    return;
+  }
   const job = remote.data.brainJob;
   const done = remote.data.brainReply;
-  if (done && done.id === job.id && (done.lines || done.error || done.status === "loading")) return;
+  if (done && done.id === job.id && (done.lines || done.error)) return;
   brainWorking = true;
   try {
     if (remote.sha) state.github.sha = remote.sha;
-    await pushBrainPatch({ id: job.id, status: "loading", text: "Hermes host is loading…" });
-    const p = profileById(job.profileId);
+    setLlmStatus(`Hermes host got a chat from Phone link…`);
+    await pushBrainPatch({ id: job.id, status: "loading", text: "Hermes host is writing…" });
+    const p = jobPerson(job, remote.data);
     if (!p) {
-      await pushBrainPatch({ id: job.id, error: "That person isn't on this computer's board." });
+      await pushBrainPatch({ id: job.id, error: "That person isn't on Hermes host. Open the same board on the computer." });
       return;
     }
     const lines = await latchLLM.reply(p, job.thread, job.user || state.user);
     await pushBrainPatch({ id: job.id, lines, at: Date.now() });
-    setGhStatus("Answered a Phone link chat");
+    setLlmStatus("Hermes host answered Phone link");
+    setGhStatus("Hermes host answered Phone link");
   } catch (err) {
     try {
       await pushBrainPatch({ id: job.id, error: err.message || "Hermes failed" });
     } catch (_) {}
+    setLlmStatus(err.message || "Hermes host failed");
   } finally {
     brainWorking = false;
   }
 }
 
 function startBrainLoop() {
-  if (startBrainLoop.t) return;
-  startBrainLoop.t = setInterval(() => {
-    if (!state.onboarded || !latchStorage.getToken() || latchLLM.isTightDevice()) return;
+  if (!startBrainLoop.t) {
+    startBrainLoop.t = setInterval(() => {
+      if (!state.onboarded || !latchStorage.getToken() || latchLLM.deviceRole() !== "host") return;
+      processBrainJob().catch(() => {});
+    }, 1500);
+  }
+  if (state.onboarded && latchStorage.getToken() && latchLLM.deviceRole() === "host") {
     processBrainJob().catch(() => {});
-  }, 2500);
+  }
 }
 
 /* Per-person overrides from the admin sheet, applied on read so every card, chat and
@@ -907,6 +939,7 @@ function bindLlm(root) {
         await latchLLM.ensureLocal();
         latchLLM.setConfig({ localReady: true, enabled: true });
         toast("Hermes host ready — leave this tab open");
+        startBrainLoop();
       } else {
         const models = await latchLLM.listModels();
         llmFieldsHtml.models = models;
@@ -1783,7 +1816,7 @@ function matchNow(id, headline, userNote) {
 function sendUserMessage(id, text) {
   if (!state.threads[id]) state.threads[id] = [];
   state.threads[id].push({ from: "me", text, ts: Date.now() });
-  save();
+  save({ skipRemote: canUseBrain() });
   render();
   queueBotReply(id, text);
 }
