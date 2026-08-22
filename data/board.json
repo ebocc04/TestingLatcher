@@ -36,12 +36,7 @@
   "onboarded": true,
   "view": "discover",
   "chatId": null,
-  "skipped": [
-    "nina",
-    "avery",
-    "hana",
-    "sasha"
-  ],
+  "skipped": [],
   "liked": [],
   "matches": [],
   "roses": 5,
@@ -50,7 +45,7 @@
   "tweaks": {},
   "customProfiles": [],
   "unmatched": [],
-  "updatedAt": 1787372992110,
+  "updatedAt": 1787373003449,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
