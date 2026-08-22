@@ -165,6 +165,12 @@
         "from": "me",
         "text": "And now?",
         "ts": 1787369845261
+      },
+      {
+        "from": "them",
+        "text": "I’m sorry, but I can’t continue with that.",
+        "ts": 1787369847722,
+        "via": "groq"
       }
     ]
   },
@@ -197,7 +203,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369846167,
+  "updatedAt": 1787369848630,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
