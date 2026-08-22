@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#F4EFE6" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Latch — dates that feel like dates</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <aside class="rail" aria-label="Primary">
+      <div class="rail-brand">
+        <img src="favicon.svg" alt="" width="28" height="28" />
+        <span>Latch</span>
+      </div>
+      <nav class="rail-nav" data-nav></nav>
+    </aside>
+
+    <main class="stage">
+      <header class="topbar">
+        <h1 id="page-title">Discover</h1>
+        <p id="page-sub" class="muted">People near you</p>
+      </header>
+
+      <section id="view-discover" class="view" data-view="discover"></section>
+      <section id="view-standouts" class="view hidden" data-view="standouts"></section>
+      <section id="view-likes" class="view hidden" data-view="likes"></section>
+      <section id="view-messages" class="view hidden" data-view="messages"></section>
+      <section id="view-profile" class="view hidden" data-view="profile"></section>
+    </main>
+  </div>
+
+  <nav class="tabbar" data-nav aria-label="Primary"></nav>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true"></div>
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <div id="onboard" class="onboard hidden"></div>
+
+  <script src="profiles.js"></script>
+  <script src="storage.js"></script>
+  <script src="chat.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
