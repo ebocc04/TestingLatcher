@@ -156,24 +156,59 @@
       .slice(0, 2);
   }
 
-  async function reply(p, thread, me) {
-    if (!active()) return null;
-    const data = await call("/chat/completions", {
+  /* gpt-oss is a reasoning model. Groq spends max_tokens thinking first; 160 was
+     enough to think and not enough to speak, so content came back empty and the
+     app silently fell back to the rule engine. max_completion_tokens is the
+     current Groq field; reasoning_effort:low keeps thinking short. */
+  function extractText(data) {
+    const choice = data && data.choices && data.choices[0];
+    const msg = (choice && choice.message) || {};
+    let text = msg.content || msg.reasoning_content || "";
+    if (Array.isArray(text)) {
+      text = text.map((p) => (typeof p === "string" ? p : p.text || p.content || "")).join("\n");
+    }
+    /* Harmony-style dump: keep only the final channel if both leaked through. */
+    const final = String(text).split(/\n(?:final|assistantfinal)\n/i);
+    if (final.length > 1) text = final[final.length - 1];
+    text = String(text)
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .replace(/^\s*analysis\s*\n[\s\S]*?\n(?:final|assistant)\s*\n/i, "")
+      .trim();
+    return { text, finish: choice && choice.finish_reason, usage: data && data.usage };
+  }
+
+  async function complete(messages, budget) {
+    return call("/chat/completions", {
       method: "POST",
       body: JSON.stringify({
         model: config().model || DEFAULT_MODEL,
-        messages: toMessages(p, thread, me),
+        messages,
         temperature: 0.9,
         top_p: 0.95,
-        max_tokens: 160,
-        /* Long monologues are the giveaway; stop it before it writes an essay. */
-        presence_penalty: 0.3,
-        frequency_penalty: 0.3
+        max_completion_tokens: budget,
+        reasoning_effort: "low"
       })
     });
-    const text = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "";
+  }
+
+  async function reply(p, thread, me) {
+    if (!active()) return null;
+    const messages = toMessages(p, thread, me);
+    let data = await complete(messages, 1024);
+    let { text, finish } = extractText(data);
+    if (!text && finish === "length") {
+      data = await complete(messages, 2048);
+      ({ text, finish } = extractText(data));
+    }
     const lines = toLines(text);
-    return lines.length ? lines : null;
+    if (!lines.length) {
+      throw new Error(
+        finish === "length"
+          ? "Model used its whole budget thinking and wrote nothing. Try again."
+          : "Groq came back empty."
+      );
+    }
+    return lines;
   }
 
   global.latchLLM = { getKey, setKey, config, setConfig, active, listModels, reply, systemPrompt, DEFAULT_MODEL };

@@ -256,6 +256,27 @@ img { max-width: 100%; display: block; }
   padding-bottom: 12px;
 }
 .chat-head img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.engine-pill {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #ece4d6;
+  color: var(--muted);
+}
+.engine-pill.on { background: #1a1714; color: #fff; }
+.bubble .via {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.65rem;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
 .chat-who { min-width: 0; flex: 1; }
 .chat-who strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-btn { font-size: 1.1rem; padding: 6px 10px; }

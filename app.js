@@ -532,8 +532,9 @@ function renderChat(root) {
     return;
   }
   const msgs = state.threads[p.id] || [];
+  const live = window.latchLLM && latchLLM.active();
   $("page-title").textContent = p.name;
-  $("page-sub").textContent = "Active now";
+  $("page-sub").textContent = live ? `Active now · Groq` : `Active now · built-in replies`;
   root.innerHTML = `
     <div class="chat">
       <div class="chat-head">
@@ -543,11 +544,15 @@ function renderChat(root) {
           <strong>${esc(p.name)}, ${p.age}</strong>
           <div class="muted" style="font-size:.8rem">${esc(orientationLabel(p.orientation))} · ${esc(p.job)}</div>
         </div>
+        <span class="engine-pill ${live ? "on" : ""}">${live ? "Groq" : "Built-in"}</span>
         <button class="btn-ghost menu-btn" id="chat-menu" aria-label="Chat options">☰</button>
       </div>
       <div class="bubbles" id="bubbles">
         ${msgs
-          .map((m) => `<div class="bubble ${m.from === "me" ? "me" : "them"}">${esc(m.text)}</div>`)
+          .map((m) => {
+            const via = m.from === "them" && m.via ? `<i class="via">${m.via === "groq" ? "groq" : "built-in"}</i>` : "";
+            return `<div class="bubble ${m.from === "me" ? "me" : "them"}">${esc(m.text)}${via}</div>`;
+          })
           .join("")}
         ${state.pendingBots[p.id] ? `<div class="typing">${esc(p.name)} is typing…</div>` : ""}
       </div>
@@ -1150,23 +1155,23 @@ async function queueBotReply(id, userText) {
   const p = profileById(id);
   const thread = state.threads[id] || [];
 
-  /* Show them typing while the model is thinking, then fall back to the rule engine if
-     there's no key, the request fails, or the reply comes back empty. */
   state.pendingBots[id] = true;
   render();
   let lines = null;
+  let via = "rules";
   if (window.latchLLM && latchLLM.active()) {
     try {
       lines = await latchLLM.reply(p, thread, state.user);
+      if (lines && lines.length) via = "groq";
     } catch (err) {
       lines = null;
-      if (!queueBotReply.warned) {
-        queueBotReply.warned = true;
-        toast(`Chat model unavailable — using built-in replies. ${err.message}`);
-      }
+      toast(`Groq failed — built-in reply. ${err.message}`);
     }
   }
-  if (!lines) lines = latchConverse(p, userText, thread, state.user).lines;
+  if (!lines) {
+    lines = latchConverse(p, userText, thread, state.user).lines;
+    via = "rules";
+  }
 
   const queue = (lines || []).filter(Boolean).slice(0, 3);
   if (!queue.length) {
@@ -1183,7 +1188,7 @@ async function queueBotReply(id, userText) {
     const delay = ((i === 0 ? 800 : 400) + typing + Math.random() * 700) * pace;
     setTimeout(() => {
       if (!state.threads[id]) state.threads[id] = [];
-      state.threads[id].push({ from: "them", text: queue[i], ts: Date.now() });
+      state.threads[id].push({ from: "them", text: queue[i], ts: Date.now(), via });
       state.pendingBots[id] = false;
       if (state.view !== "chat" || state.chatId !== id) state.unread[id] = true;
       save();

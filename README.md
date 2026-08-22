@@ -31,7 +31,7 @@ Two engines. With a Groq API key, replies come from a language model that reads 
 
 Profile → **Chat engine** → paste a [Groq key](https://console.groq.com/keys) → **Connect**. Groq sends CORS headers, so this static site calls the API directly with no server or proxy. The key is stored in `localStorage` only — it never enters app state or `board.json`, so the GitHub sync can't commit it.
 
-The model list is fetched from your account rather than hardcoded, because Groq retires model IDs on a schedule (the Llama chat models were shut down in August 2026). Default is `openai/gpt-oss-20b`.
+The model list is fetched from your account rather than hardcoded, because Groq retires model IDs on a schedule (the Llama chat models were shut down in August 2026). Default is `openai/gpt-oss-20b`, a reasoning model — requests must use a large `max_completion_tokens` budget or Groq returns empty content and Latch used to silently fall back to the rule engine. Chat now labels each bot bubble `groq` or `built-in` so you can see which engine wrote it.
 
 Each person's system prompt is compiled from their profile *and* their admin overrides, so chat tone, flirtiness, emoji, lowercase and reply length steer the model. `llm.js` returns `null` on a missing key, a failed request or an empty reply, and `app.js` falls back to the rule engine.
 
