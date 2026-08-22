@@ -67,6 +67,12 @@
         "from": "me",
         "text": "Yeah? With pants off?",
         "ts": 1787370754153
+      },
+      {
+        "from": "them",
+        "text": "I'm open to trying anything that doesn't involve a polyester jumpsuit",
+        "ts": 1787370757453,
+        "via": "local"
       }
     ]
   },
@@ -124,7 +130,7 @@
   "unmatched": [
     "nina"
   ],
-  "updatedAt": 1787370755054,
+  "updatedAt": 1787370758356,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
