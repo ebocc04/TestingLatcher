@@ -533,8 +533,9 @@ function renderChat(root) {
   }
   const msgs = state.threads[p.id] || [];
   const live = window.latchLLM && latchLLM.active();
+  const engineName = live ? (latchLLM.config().provider === "openrouter" ? "OpenRouter" : "Groq") : "Built-in";
   $("page-title").textContent = p.name;
-  $("page-sub").textContent = live ? `Active now · Groq` : `Active now · built-in replies`;
+  $("page-sub").textContent = `Active now · ${engineName}`;
   root.innerHTML = `
     <div class="chat">
       <div class="chat-head">
@@ -544,13 +545,13 @@ function renderChat(root) {
           <strong>${esc(p.name)}, ${p.age}</strong>
           <div class="muted" style="font-size:.8rem">${esc(orientationLabel(p.orientation))} · ${esc(p.job)}</div>
         </div>
-        <span class="engine-pill ${live ? "on" : ""}">${live ? "Groq" : "Built-in"}</span>
+        <span class="engine-pill ${live ? "on" : ""}">${engineName}</span>
         <button class="btn-ghost menu-btn" id="chat-menu" aria-label="Chat options">☰</button>
       </div>
       <div class="bubbles" id="bubbles">
         ${msgs
           .map((m) => {
-            const via = m.from === "them" && m.via ? `<i class="via">${m.via === "groq" ? "groq" : "built-in"}</i>` : "";
+            const via = m.from === "them" && m.via ? `<i class="via">${m.via === "rules" ? "built-in" : m.via}</i>` : "";
             return `<div class="bubble ${m.from === "me" ? "me" : "them"}">${esc(m.text)}${via}</div>`;
           })
           .join("")}
@@ -598,15 +599,22 @@ function llmFieldsHtml() {
   const cfg = latchLLM.config();
   const key = latchLLM.getKey();
   const on = latchLLM.active();
-  const models = llmFieldsHtml.models || (key ? [cfg.model] : []);
+  const spec = latchLLM.providers[cfg.provider];
+  const models = llmFieldsHtml.models || spec.curated.concat(cfg.model).filter((v, i, a) => a.indexOf(v) === i);
   return `<div class="prompt-card">
     <p class="q">Chat engine</p>
-    <p class="muted" style="margin:0 0 12px">Paste a <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">Groq API key</a> and matches are written by a real language model that reads the whole conversation. Without one, the built-in reply engine is used. The key stays in this browser and is never saved to your board.</p>
-    <label class="stack">Groq API key
-      <input class="field" type="password" id="llm-key" value="${esc(key)}" placeholder="gsk_…" autocomplete="off" />
+    <p class="muted" style="margin:0 0 12px"><b>Groq refuses flirty / sexual texts</b> — that's their filter, not Latch. Use <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">OpenRouter</a> with Venice Uncensored if you want replies like a real match. The key stays in this browser and is never saved to your board.</p>
+    <label class="stack">Provider
+      <select class="field" id="llm-provider">
+        <option value="openrouter" ${cfg.provider === "openrouter" ? "selected" : ""}>OpenRouter — unfiltered dating chat</option>
+        <option value="groq" ${cfg.provider === "groq" ? "selected" : ""}>Groq — fast, refuses flirty chat</option>
+      </select>
+    </label>
+    <label class="stack" style="margin-top:10px">${esc(spec.label)} API key
+      <input class="field" type="password" id="llm-key" value="${esc(key)}" placeholder="${esc(spec.keyHint)}" autocomplete="off" />
     </label>
     <label class="stack" style="margin-top:10px">Model
-      <select class="field" id="llm-model">${(models.length ? models : [cfg.model])
+      <select class="field" id="llm-model">${models
         .map((m) => `<option value="${esc(m)}" ${m === cfg.model ? "selected" : ""}>${esc(m)}</option>`)
         .join("")}</select>
     </label>
@@ -629,15 +637,23 @@ function setLlmStatus(msg) {
 function bindLlm(root) {
   const keyEl = root.querySelector("#llm-key");
   const modelEl = root.querySelector("#llm-model");
+  const provEl = root.querySelector("#llm-provider");
   root.querySelector("#llm-off")?.addEventListener("change", (e) => {
     latchLLM.setConfig({ enabled: !e.target.checked });
     setLlmStatus(latchLLM.active() ? `Live — ${latchLLM.config().model}` : "Off — using built-in replies");
+  });
+  provEl?.addEventListener("change", () => {
+    const spec = latchLLM.providers[provEl.value];
+    latchLLM.setConfig({ provider: provEl.value, model: spec.defaultModel });
+    llmFieldsHtml.models = spec.curated;
+    renderProfile();
   });
   modelEl?.addEventListener("change", () => {
     latchLLM.setConfig({ model: modelEl.value });
     setLlmStatus(`Live — ${modelEl.value}`);
   });
   root.querySelector("#llm-connect")?.addEventListener("click", async () => {
+    if (provEl) latchLLM.setConfig({ provider: provEl.value });
     latchLLM.setKey(keyEl.value);
     if (!keyEl.value.trim()) {
       setLlmStatus("Key cleared — using built-in replies");
@@ -648,8 +664,8 @@ function bindLlm(root) {
       const models = await latchLLM.listModels();
       llmFieldsHtml.models = models;
       const cfg = latchLLM.config();
-      /* Groq retires model IDs regularly, so keep the saved one only if it still exists. */
-      const model = models.includes(cfg.model) ? cfg.model : models.includes(latchLLM.DEFAULT_MODEL) ? latchLLM.DEFAULT_MODEL : models[0];
+      const fallback = latchLLM.DEFAULT_MODEL;
+      const model = models.includes(cfg.model) ? cfg.model : models.includes(fallback) ? fallback : models[0];
       latchLLM.setConfig({ model, enabled: true });
       toast(`Chat model connected — ${model}`);
       renderProfile();
@@ -1169,10 +1185,10 @@ async function queueBotReply(id, userText) {
   if (window.latchLLM && latchLLM.active()) {
     try {
       lines = await latchLLM.reply(p, thread, state.user);
-      if (lines && lines.length) via = "groq";
+      if (lines && lines.length) via = latchLLM.config().provider || "llm";
     } catch (err) {
       lines = null;
-      toast(`Groq failed — built-in reply. ${err.message}`);
+      toast(`Model failed — built-in reply. ${err.message}`);
     }
   }
   if (!lines) {

@@ -25,13 +25,15 @@ Photos are compressed to JPEG before save so the Contents API stays under size l
 
 ## Chat
 
-Two engines. With a Groq API key, replies come from a language model that reads the whole conversation; without one, the built-in rule engine handles it.
+Two engines. With an API key, replies come from a language model that reads the whole conversation; without one, the built-in rule engine handles it.
 
 ### Language model (recommended)
 
-Profile → **Chat engine** → paste a [Groq key](https://console.groq.com/keys) → **Connect**. Groq sends CORS headers, so this static site calls the API directly with no server or proxy. The key is stored in `localStorage` only — it never enters app state or `board.json`, so the GitHub sync can't commit it.
+**Use OpenRouter, not Groq, if you want flirty / sexual dating chat.** Groq's hosted models refuse those turns (`I can't help with that`). That is their safety filter and Latch cannot disable it. OpenRouter can route to uncensored models (default: Venice Uncensored / Dolphin).
 
-The model list is fetched from your account rather than hardcoded, because Groq retires model IDs on a schedule (the Llama chat models were shut down in August 2026). Default is `openai/gpt-oss-20b`, a reasoning model — requests must use a large `max_completion_tokens` budget or Groq returns empty content and Latch used to silently fall back to the rule engine. Chat now labels each bot bubble `groq` or `built-in` so you can see which engine wrote it.
+Profile → **Chat engine** → pick OpenRouter → paste a [key](https://openrouter.ai/keys) → **Connect**. Both APIs send CORS headers, so this static site calls them directly. The key is stored in `localStorage` only — never in `board.json`.
+
+If a model returns a refusal, Latch throws it away instead of showing it as the match. Switch models if that happens.
 
 Each person's system prompt is compiled from their profile *and* their admin overrides, so chat tone, flirtiness, emoji, lowercase and reply length steer the model. `llm.js` returns `null` on a missing key, a failed request or an empty reply, and `app.js` falls back to the rule engine.
 
