@@ -37,14 +37,16 @@
   "view": "discover",
   "chatId": null,
   "skipped": [],
-  "liked": [],
+  "liked": [
+    "nina"
+  ],
   "matches": [],
   "roses": 5,
   "threads": {},
   "unread": {},
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787364484772,
+  "updatedAt": 1787364487820,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
