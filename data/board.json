@@ -127,6 +127,11 @@
         "text": "Sounds delicious. Do you have a favorite dessert spot?",
         "ts": 1787369147749,
         "via": "groq"
+      },
+      {
+        "from": "me",
+        "text": "Your bed",
+        "ts": 1787369154797
       }
     ]
   },
@@ -190,7 +195,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369148659,
+  "updatedAt": 1787369155703,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
