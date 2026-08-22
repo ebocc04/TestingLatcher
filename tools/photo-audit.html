@@ -1,0 +1,42 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>photo audit</title>
+<style>
+  body { margin: 0; background: #fff; font: 10px system-ui; }
+  #out { display: flex; flex-wrap: wrap; }
+  .row { display: flex; align-items: center; gap: 1px; border: 1px solid #bbb; padding: 1px; }
+  .lab { width: 46px; flex: none; font-weight: 600; }
+  figure { margin: 0; }
+  img { width: var(--w, 108px); height: calc(var(--w, 108px) * 1.26); object-fit: cover; background: #eee; display: block; }
+  figcaption { text-align: center; }
+</style>
+<div id="out"></div>
+<script src="../profiles.js"></script>
+<script>
+  const q = new URLSearchParams(location.search);
+  if (q.has("w")) document.documentElement.style.setProperty("--w", `${Number(q.get("w"))}px`);
+  if (q.has("roster")) {
+    const from = Number(q.get("from") || 0);
+    const to = Number(q.get("to") || 8);
+    document.getElementById("out").innerHTML = window.LATCH_PROFILES.slice(from, to)
+      .map(
+        (p) =>
+          `<div class="row"><div class="lab">${p.name}<br>${p.age}</div>${p.photos
+            .map((u) => `<figure><img src="${u}"></figure>`)
+            .join("")}</div>`
+      )
+      .join("");
+    throw new Error("roster rendered");
+  }
+  const bases = (q.get("bases") || "").split(",").filter(Boolean).map(Number);
+  const span = Number(q.get("span") || 4);
+  const url = (id) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=300`;
+  document.getElementById("out").innerHTML = bases
+    .map((base) => {
+      const cells = Array.from({ length: span }, (_, i) => base + i)
+        .map((id) => `<figure><img src="${url(id)}" loading="eager"><figcaption>${id}</figcaption></figure>`)
+        .join("");
+      return `<div class="row"><div class="lab">${base}</div>${cells}</div>`;
+    })
+    .join("");
+</script>

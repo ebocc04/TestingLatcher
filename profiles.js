@@ -1,7 +1,6 @@
-/* Licensed Unsplash + Pexels photoshoots. Each person is a real multi-photo set, not crops. */
-function unsplash(ids) {
-  return ids.map((id) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&h=1150&q=80`);
-}
+/* Pexels IDs are consecutive within a single shoot, so each set below is one model
+   photographed in one session. Verified by eye with tools/photo-audit.html — do not
+   swap in nearby IDs without re-checking, neighbouring IDs are often strangers. */
 function pexels(ids) {
   return ids.map((id) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=900`);
 }
@@ -21,11 +20,7 @@ window.LATCH_PROFILES = [
     standout: true,
     likesYou: true,
     likeNote: "Your hiking prompt — same, but I bring better snacks.",
-    photos: unsplash([
-      "photo-1571513722275-4b41940f54b8",
-      "photo-1571513721963-d855fd8df4c2",
-      "photo-1571513800374-df1bbe650e56"
-    ]),
+    photos: pexels([1462637, 1462638, 1462639]),
     prompts: [
       { q: "A life goal of mine", a: "Have a garden that actually produces tomatoes, not just vibes." },
       { q: "The way to win me over is", a: "Plan a walk with no destination and a playlist we both pretend we made." },
@@ -61,7 +56,7 @@ window.LATCH_PROFILES = [
     intention: "Open to whatever",
     standout: true,
     likesYou: false,
-    photos: pexels([2379004, 2379005, 2379006]),
+    photos: pexels([16115493, 16115494, 16115495]),
     prompts: [
       { q: "I'll fall for you if", a: "You can sit through a whole record without checking your phone." },
       { q: "My simple pleasures", a: "Late-night diner coffee and a booth nobody wants." },
@@ -98,7 +93,7 @@ window.LATCH_PROFILES = [
     standout: false,
     likesYou: true,
     likeNote: "Liked your 'Sunday morning' prompt.",
-    photos: pexels([1181686, 1181519, 1181424]),
+    photos: pexels([38178737, 38178738, 38178739]),
     prompts: [
       { q: "I want someone who", a: "Can handle a 12-hour story and still wants to hear the rest." },
       { q: "Typical Sunday", a: "Farmers market, overcaffeinated, maybe a nap I pretend I earned." },
@@ -135,7 +130,7 @@ window.LATCH_PROFILES = [
     standout: true,
     likesYou: true,
     likeNote: "Your photo in the bookstore. I do that too, I just pretend I'm browsing.",
-    photos: pexels([1043471, 1043473, 1043474]),
+    photos: pexels([1043471, 1043472, 1043474]),
     prompts: [
       { q: "I'm looking for", a: "Someone who notices good light in a room and also knows when to leave a party." },
       { q: "Don't hate me if I", a: "Stop walking to look at a building like it's a celebrity." },
@@ -171,11 +166,7 @@ window.LATCH_PROFILES = [
     intention: "Figuring it out",
     standout: false,
     likesYou: false,
-    photos: unsplash([
-      "photo-1543654916-8071f17ee466",
-      "photo-1543654916-24cb93a9e817",
-      "photo-1543654916-52cb2192d8c2"
-    ]),
+    photos: pexels([35555305, 35555306, 35555307]),
     prompts: [
       { q: "I'll pick the place if", a: "You pick the dessert. That's a personality test, sorry." },
       { q: "Green flags I look for", a: "You talk to service staff like they're people. Bar is on the floor." },
@@ -212,7 +203,7 @@ window.LATCH_PROFILES = [
     standout: false,
     likesYou: true,
     likeNote: "You seem like you'd trash-talk in a friendly way. I respect that.",
-    photos: pexels([428353, 428361, 428364]),
+    photos: pexels([10143324, 10143325, 10143327]),
     prompts: [
       { q: "I'm overly competitive about", a: "Board games, pickup, and who gets the better parking spot." },
       { q: "Let's debate", a: "Whether a first date should have a plan or a vibe." },
@@ -248,7 +239,7 @@ window.LATCH_PROFILES = [
     intention: "Looking for something serious",
     standout: true,
     likesYou: false,
-    photos: pexels([1130623, 1130624, 1130626]),
+    photos: pexels([21966540, 21966541, 21966542]),
     prompts: [
       { q: "I'm convinced that", a: "The best dates end with 'wait, one more story.'"},
       { q: "My love language is", a: "Voice notes that are way too long and photos of weird signs." },
@@ -284,7 +275,7 @@ window.LATCH_PROFILES = [
     intention: "Open to whatever",
     standout: false,
     likesYou: false,
-    photos: pexels([2182970, 2182971, 2182972]),
+    photos: pexels([1222271, 1222272, 1222273]),
     prompts: [
       { q: "Typical Sunday", a: "Trail in the morning, something fried after, zero guilt." },
       { q: "The dumber the better", a: "Roadside attractions. I will pull over for a giant peach." },
@@ -321,7 +312,7 @@ window.LATCH_PROFILES = [
     standout: true,
     likesYou: true,
     likeNote: "You seem thoughtful. That's the whole app for me.",
-    photos: pexels([1036623, 1036622, 1036627]),
+    photos: pexels([31868676, 31868677, 31868678]),
     prompts: [
       { q: "I'm looking for", a: "A partner, not a project, not a placeholder." },
       { q: "The key to my heart is", a: "Curiosity without an interrogation vibe." },
@@ -394,7 +385,7 @@ window.LATCH_PROFILES = [
     standout: false,
     likesYou: true,
     likeNote: "Your prompt about bad first dates made me laugh out loud on a bus.",
-    photos: pexels([1462637, 1462638, 1462640]),
+    photos: pexels([1130623, 1130624, 1130625]),
     prompts: [
       { q: "The hallmark of a good relationship is", a: "Inside jokes that would make no sense in a deposition." },
       { q: "I'm overly competitive about", a: "Trivia. It's a problem. I have a spreadsheet. That's two problems." },
@@ -430,7 +421,7 @@ window.LATCH_PROFILES = [
     intention: "Looking for something serious",
     standout: true,
     likesYou: false,
-    photos: pexels([8090140, 8090141, 8090142]),
+    photos: pexels([775359, 775360]),
     prompts: [
       { q: "I want someone who", a: "Sees the same strange details I do and doesn't need them explained." },
       { q: "Together we could", a: "Get lost on purpose and call it research." },
@@ -466,7 +457,7 @@ window.LATCH_PROFILES = [
     intention: "Figuring it out",
     standout: false,
     likesYou: false,
-    photos: pexels([775358, 775359, 775360]),
+    photos: pexels([36713167, 36713168, 36713169]),
     prompts: [
       { q: "The way to win me over is", a: "Bring me a weird grocery-store flower and commit to the bit." },
       { q: "My simple pleasures", a: "Early shop, quiet, stems in buckets, a song on repeat." },
@@ -503,7 +494,7 @@ window.LATCH_PROFILES = [
     standout: false,
     likesYou: true,
     likeNote: "You seem like you'd call me on my nonsense. Please do.",
-    photos: pexels([937481, 937482, 937483]),
+    photos: pexels([2379004, 2379005]),
     prompts: [
       { q: "I'm looking for", a: "Someone who makes weeknights feel like they count." },
       { q: "I'll fall for you if", a: "You have a point of view and you can change it." },
@@ -539,7 +530,7 @@ window.LATCH_PROFILES = [
     intention: "Open to whatever",
     standout: true,
     likesYou: false,
-    photos: pexels([1222271, 1222272, 1222273]),
+    photos: pexels([4925760, 4925761, 4925763]),
     prompts: [
       { q: "Dating me is like", a: "Slow mornings, clay on everything, and I will remember how you take your coffee." },
       { q: "Green flags I look for", a: "You have a craft, even a tiny one." },
@@ -575,7 +566,7 @@ window.LATCH_PROFILES = [
     intention: "Looking for something serious",
     standout: false,
     likesYou: false,
-    photos: pexels([91227, 91228, 91229]),
+    photos: pexels([18355488, 18355489, 18355490]),
     prompts: [
       { q: "Let's make sure we're on the same page about", a: "Ambition that still leaves room for a Tuesday night on the couch." },
       { q: "The one thing I'd love to know about you", a: "What you do when you're not trying to impress anyone." },
