@@ -110,6 +110,12 @@
         "from": "me",
         "text": "Yeah you’re in? Can’t wait. You are into women right? Like sexually?",
         "ts": 1787369677258
+      },
+      {
+        "from": "them",
+        "text": "I’m straight, so I’m only into men. Sorry if that’s a nope for you.",
+        "ts": 1787369680700,
+        "via": "groq"
       }
     ]
   },
@@ -142,7 +148,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369678164,
+  "updatedAt": 1787369681609,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
