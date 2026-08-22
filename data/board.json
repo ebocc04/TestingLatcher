@@ -63,6 +63,11 @@
         "from": "me",
         "text": "lol what?",
         "ts": 1787363940666
+      },
+      {
+        "from": "them",
+        "text": "you talk to service staff like they're people. bar is on the floor.",
+        "ts": 1787363943793
       }
     ]
   },
@@ -71,7 +76,7 @@
   },
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787363941568,
+  "updatedAt": 1787363944695,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
