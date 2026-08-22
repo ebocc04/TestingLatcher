@@ -59,6 +59,60 @@
     };
   }
 
+  function inferTarget() {
+    const fallback = {
+      owner: "ebocc04",
+      repo: "TestingLatcher",
+      branch: "main",
+      path: "data/board.json",
+      sha: null
+    };
+    try {
+      const host = (location.hostname || "").toLowerCase();
+      if (!host.endsWith(".github.io")) return fallback;
+      const owner = host.split(".")[0];
+      const seg = location.pathname.split("/").filter(Boolean)[0];
+      return {
+        owner,
+        repo: seg || `${owner}.github.io`,
+        branch: "main",
+        path: "data/board.json",
+        sha: null
+      };
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function friendlyGhError(status, message) {
+    if (status === 401) return "That token was rejected. Paste a new one.";
+    if (status === 403) return "This token can't write the repo. Give it Contents: Read and write.";
+    if (status === 404) return "Can't see the repo with this token. Enable Contents access for this repository.";
+    return message || `GitHub error (${status})`;
+  }
+
+  async function connect(token) {
+    const clean = String(token || "").trim();
+    if (!clean) throw new Error("Paste a token first");
+    setToken(clean);
+    const target = inferTarget();
+    const who = await fetch("https://api.github.com/user", { headers: ghHeaders(clean) });
+    if (!who.ok) throw new Error(friendlyGhError(who.status, (await who.json().catch(() => ({}))).message));
+    const user = await who.json();
+    let repoRes = await fetch(`https://api.github.com/repos/${target.owner}/${target.repo}`, {
+      headers: ghHeaders(clean)
+    });
+    if (repoRes.status === 404 && user.login && user.login !== target.owner) {
+      target.owner = user.login;
+      repoRes = await fetch(`https://api.github.com/repos/${target.owner}/${target.repo}`, {
+        headers: ghHeaders(clean)
+      });
+    }
+    if (!repoRes.ok) throw new Error(friendlyGhError(repoRes.status, (await repoRes.json().catch(() => ({}))).message));
+    const board = await pullBoard(target);
+    return { login: user.login, target, board };
+  }
+
   async function pullBoard(github) {
     const token = getToken();
     if (!token || !github?.owner || !github?.repo) return null;
@@ -68,7 +122,7 @@
     if (res.status === 404) return { missing: true, sha: null, data: null };
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `GitHub read failed (${res.status})`);
+      throw new Error(friendlyGhError(res.status, err.message));
     }
     const body = await res.json();
     const data = JSON.parse(fromB64(body.content));
@@ -98,7 +152,7 @@
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `GitHub write failed (${res.status})`);
+      throw new Error(friendlyGhError(res.status, err.message));
     }
     const body = await res.json();
     return body.content?.sha || body.sha;
@@ -123,6 +177,8 @@
     STATE_KEY,
     TOKEN_KEY,
     compressImage,
+    inferTarget,
+    connect,
     getToken,
     setToken,
     pullBoard,

@@ -10,15 +10,12 @@ The opening flow is a full profile: name, age, gender, who you want to see, phot
 
 ## Saving (browser + GitHub)
 
-The app always writes to `localStorage`. To keep the same board after you upload the site (or switch devices):
+The app always writes to `localStorage`. To keep the same board on this site:
 
-1. Create a GitHub repo and put these files in it.
-2. Enable Pages (Settings → Pages → deploy `main` / root).
-3. Create a **fine-grained personal access token** with **Contents: Read and write** on that repo only.
-4. In Latch → Profile (or the last onboarding step), enter owner, repo, path `data/board.json`, and the token.
-5. **Save to GitHub**. The site will create/update `data/board.json`.
+1. Create a **fine-grained token** with **Contents: Read and write** on `ebocc04/TestingLatcher`.
+2. In Latch → Profile, paste the token and tap **Connect**. The app already knows this repo.
 
-The token is stored only in your browser (`latch-gh-token`). It is **not** written into `board.json`. Do not commit a token into the repo.
+The token stays in your browser. It is never written into `board.json`.
 
 Photos are compressed to JPEG before save so the Contents API stays under size limits.
 

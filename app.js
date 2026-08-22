@@ -10,6 +10,7 @@ const defaultUser = () => ({
   name: "",
   age: 28,
   gender: "women",
+  orientation: "",
   city: "Austin",
   seeking: "everyone",
   job: "",
@@ -24,13 +25,43 @@ const defaultUser = () => ({
   ]
 });
 
-const defaultGithub = () => ({
-  owner: "",
-  repo: "",
-  branch: "main",
-  path: "data/board.json",
-  sha: null
-});
+const ORIENTATIONS = [
+  ["straight", "Straight"],
+  ["gay", "Gay"],
+  ["lesbian", "Lesbian"],
+  ["bisexual", "Bisexual"],
+  ["queer", "Queer"],
+  ["pansexual", "Pansexual"],
+  ["asexual", "Asexual"],
+  ["questioning", "Questioning"]
+];
+
+function orientationLabel(key) {
+  return (ORIENTATIONS.find(([v]) => v === key) || [key, key || "—"])[1];
+}
+
+function genderLabel(key) {
+  return { women: "Woman", men: "Man", nonbinary: "Non-binary" }[key] || key;
+}
+
+function openTo(person, targetGender) {
+  const o = person.orientation;
+  const g = person.gender;
+  if (!o || !targetGender) return true;
+  if (["bisexual", "queer", "pansexual", "questioning", "asexual"].includes(o)) return true;
+  if (o === "straight") {
+    if (g === "women") return targetGender === "men";
+    if (g === "men") return targetGender === "women";
+    return true;
+  }
+  if (o === "gay") {
+    if (g === "men") return targetGender === "men";
+    if (g === "women") return targetGender === "women";
+    return targetGender === "men" || targetGender === "nonbinary";
+  }
+  if (o === "lesbian") return targetGender === "women" || targetGender === "nonbinary";
+  return true;
+}
 
 function emptyState() {
   return {
@@ -56,6 +87,7 @@ function migrate(raw) {
   while (s.user.photos.length < 6) s.user.photos.push("");
   s.user.photos = s.user.photos.slice(0, 6);
   s.github = { ...defaultGithub(), ...(raw.github || {}) };
+  if (!s.github.owner || !s.github.repo) s.github = { ...latchStorage.inferTarget(), sha: s.github.sha || null };
   s.pendingBots = {};
   if (!s.user.photos.some(Boolean) || !s.user.name) s.onboarded = false;
   return s;
@@ -149,8 +181,11 @@ function profileById(id) {
 }
 
 function visibleProfiles() {
+  const me = state.user;
   return window.LATCH_PROFILES.filter((p) => {
-    if (state.user.seeking !== "everyone" && p.gender !== state.user.seeking) return false;
+    if (me.seeking !== "everyone" && p.gender !== me.seeking) return false;
+    if (!openTo(me, p.gender)) return false;
+    if (!openTo(p, me.gender)) return false;
     return true;
   });
 }
@@ -217,7 +252,7 @@ function setView(view, extra) {
 
 function titles() {
   const map = {
-    discover: ["Discover", `People near ${state.user.city || "you"}`],
+    discover: ["Discover", `${orientationLabel(state.user.orientation) || "Anyone"} · ${state.user.city || "near you"}`],
     standouts: ["Standouts", `${state.roses} rose${state.roses === 1 ? "" : "s"} left this week`],
     likes: ["Likes you", "People who already liked you"],
     messages: ["Matches", "Your conversations"],
@@ -270,7 +305,7 @@ function renderDiscover() {
   const root = $("view-discover");
   const queue = discoverQueue();
   if (!queue.length) {
-    root.innerHTML = `<div class="empty"><h3>You're caught up</h3><p class="muted">Check Standouts or Likes, or reset from your profile.</p></div>`;
+    root.innerHTML = `<div class="empty"><h3>You're caught up</h3><p class="muted">Nobody left in this filter. Change sexuality / Show me in Profile, or reset the deck.</p></div>`;
     return;
   }
   const p = queue[0];
@@ -283,7 +318,9 @@ function renderDiscover() {
           <img src="${esc(src)}" alt="${esc(p.name)}" />
           ${
             i === 0
-              ? `<div class="media-meta"><h2>${esc(p.name)}, ${p.age}</h2><p>${esc(p.job)} · ${esc(p.city)}</p></div>`
+              ? `<div class="media-meta"><h2>${esc(p.name)}, ${p.age}</h2>
+                <div class="chips"><span class="chip">${esc(orientationLabel(p.orientation))}</span><span class="chip">${esc(genderLabel(p.gender))}</span></div>
+                <p>${esc(p.job)}</p></div>`
               : ""
           }
         </div>
@@ -299,6 +336,8 @@ function renderDiscover() {
         )
         .join("")}
       <div class="facts-card">
+        <div class="fact"><span>Gender</span><b>${esc(genderLabel(p.gender))}</b></div>
+        <div class="fact"><span>Sexuality</span><b>${esc(orientationLabel(p.orientation))}</b></div>
         <div class="fact"><span>Height</span><b>${esc(p.height)}</b></div>
         <div class="fact"><span>School</span><b>${esc(p.school)}</b></div>
         <div class="fact"><span>Looking for</span><b>${esc(p.intention)}</b></div>
@@ -329,6 +368,7 @@ function renderStandouts() {
         <div class="pad">
           <span class="badge">This week</span>
           <h3>${esc(p.name)}, ${p.age}</h3>
+          <p>${esc(orientationLabel(p.orientation))} · ${esc(genderLabel(p.gender))}</p>
           <p>${esc(p.job)}</p>
           <span class="rose-btn" data-rose="${p.id}">Send a rose</span>
         </div>
@@ -362,6 +402,7 @@ function renderLikes() {
         <img src="${esc(photoUrl(p, 0))}" alt="" />
         <div class="pad">
           <h3>${esc(p.name)}, ${p.age}</h3>
+          <p>${esc(orientationLabel(p.orientation))} · ${esc(genderLabel(p.gender))}</p>
           ${p.likeNote ? `<p class="note">“${esc(p.likeNote)}”</p>` : `<p>${esc(p.job)}</p>`}
           <button class="match-btn" data-match="${p.id}">Match</button>
         </div>
@@ -428,7 +469,7 @@ function renderChat(root) {
         <img src="${esc(photoUrl(p, 0))}" alt="" />
         <div>
           <strong>${esc(p.name)}, ${p.age}</strong>
-          <div class="muted" style="font-size:.8rem">${esc(p.job)}</div>
+          <div class="muted" style="font-size:.8rem">${esc(orientationLabel(p.orientation))} · ${esc(p.job)}</div>
         </div>
       </div>
       <div class="bubbles" id="bubbles">
@@ -457,43 +498,60 @@ function renderChat(root) {
 }
 
 function githubFieldsHtml() {
-  const g = state.github;
+  const g = state.github.owner ? state.github : latchStorage.inferTarget();
+  state.github = { ...g, sha: state.github.sha || null };
   const token = latchStorage.getToken();
+  const connected = Boolean(token && g.owner && g.repo);
   return `<div class="prompt-card">
-    <p class="q">GitHub board</p>
-    <p class="muted" style="margin:0 0 12px">Saves your profile, likes, and chats to a JSON file in your repo (GitHub Pages compatible). Use a fine-grained token with Contents: Read and write. The token stays in this browser — it is never written into the board file.</p>
-    <label class="stack">GitHub username / org<input class="field" data-g="owner" value="${esc(g.owner)}" placeholder="yourname" /></label>
-    <label class="stack">Repo<input class="field" data-g="repo" value="${esc(g.repo)}" placeholder="latch" /></label>
-    <label class="stack">Branch<input class="field" data-g="branch" value="${esc(g.branch)}" /></label>
-    <label class="stack">File path<input class="field" data-g="path" value="${esc(g.path)}" /></label>
-    <label class="stack">Personal access token
-      <input class="field" type="password" id="gh-token" value="${esc(token)}" placeholder="ghp_…" autocomplete="off" />
+    <p class="q">Connect GitHub</p>
+    <p class="muted" style="margin:0 0 12px">Paste a token. This site already knows it saves to <b>${esc(g.owner)}/${esc(g.repo)}</b> — you don't enter a repo name.</p>
+    <label class="stack">Token
+      <input class="field" type="password" id="gh-token" value="${esc(token)}" placeholder="Paste token" autocomplete="off" />
     </label>
-    <p class="muted" data-gh-status style="margin:8px 0 0">Not connected</p>
+    <p class="muted" data-gh-status style="margin:8px 0 0">${connected ? `Ready — ${esc(g.owner)}/${esc(g.repo)}` : "Not connected"}</p>
     <div class="row" style="justify-content:flex-start;margin-top:12px">
-      <button type="button" class="btn-primary" id="gh-save">Save to GitHub</button>
-      <button type="button" class="btn-ghost" id="gh-load">Load from GitHub</button>
+      <button type="button" class="btn-primary" id="gh-connect">Connect</button>
     </div>
   </div>`;
 }
 
+async function connectGithub() {
+  const tok = document.getElementById("gh-token");
+  const token = tok ? tok.value.trim() : "";
+  setGhStatus("Connecting…");
+  try {
+    const result = await latchStorage.connect(token);
+    state.github = { ...result.target, sha: result.board?.sha || null };
+    save({ skipRemote: true });
+    if (result.board && !result.board.missing && result.board.data) {
+      const keepGh = { ...state.github };
+      if ((result.board.data.updatedAt || 0) >= (state.updatedAt || 0)) {
+        state = migrate(result.board.data);
+        state.github = keepGh;
+        latchStorage.writeLocal(state);
+      }
+    }
+    setGhStatus(`Connected as ${result.login} → ${state.github.owner}/${state.github.repo}`);
+    toast("Connected");
+    await syncToGithub();
+    if (state.onboarded) render();
+  } catch (err) {
+    setGhStatus(err.message);
+    toast(err.message);
+  }
+}
+
 function bindGithub(root) {
-  root.querySelectorAll("[data-g]").forEach((el) => {
-    el.oninput = () => {
-      state.github[el.dataset.g] = el.value.trim();
-      save({ skipRemote: true });
-    };
-  });
+  root.querySelector("#gh-connect")?.addEventListener("click", connectGithub);
   const tok = root.querySelector("#gh-token");
-  if (tok) tok.oninput = () => latchStorage.setToken(tok.value);
-  root.querySelector("#gh-save")?.addEventListener("click", () => {
-    if (tok) latchStorage.setToken(tok.value);
-    syncToGithub();
-  });
-  root.querySelector("#gh-load")?.addEventListener("click", () => {
-    if (tok) latchStorage.setToken(tok.value);
-    loadFromGithub();
-  });
+  if (tok) {
+    tok.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        connectGithub();
+      }
+    });
+  }
 }
 
 function renderProfile() {
@@ -510,6 +568,12 @@ function renderProfile() {
           <option value="women" ${u.gender === "women" ? "selected" : ""}>A woman</option>
           <option value="men" ${u.gender === "men" ? "selected" : ""}>A man</option>
           <option value="nonbinary" ${u.gender === "nonbinary" ? "selected" : ""}>Non-binary</option>
+        </select>
+      </label>
+      <label class="stack">Sexuality
+        <select data-f="orientation">
+          <option value="" ${!u.orientation ? "selected" : ""}>Select</option>
+          ${ORIENTATIONS.map(([v, l]) => `<option value="${v}" ${u.orientation === v ? "selected" : ""}>${l}</option>`).join("")}
         </select>
       </label>
       <label class="stack">Show me
@@ -552,6 +616,13 @@ function renderProfile() {
       state.user[el.dataset.f] = el.type === "number" ? Number(el.value) : el.value;
       save();
     };
+    if (el.dataset.f === "orientation" || el.dataset.f === "seeking" || el.dataset.f === "gender") {
+      el.onchange = () => {
+        state.user[el.dataset.f] = el.value;
+        save();
+        toast("Filters updated");
+      };
+    }
   });
   root.querySelectorAll("[data-pq]").forEach((el) => {
     el.onchange = () => {
@@ -612,7 +683,7 @@ function openPreview(p, opts = {}) {
   modal.innerHTML = `<div class="sheet">
     <img src="${esc(photoUrl(p, 0))}" alt="" style="width:100%;border-radius:16px;aspect-ratio:4/5;object-fit:cover" />
     <h3 style="margin-top:12px">${esc(p.name)}, ${p.age}</h3>
-    <p class="muted">${esc(p.job)}</p>
+    <p class="muted">${esc(orientationLabel(p.orientation))} · ${esc(genderLabel(p.gender))} · ${esc(p.job)}</p>
     <p class="a" style="font-family:var(--serif);font-size:1.15rem">${esc(p.prompts[0].a)}</p>
     <div class="row">
       <button class="btn-ghost" id="cancel-m">Close</button>
@@ -714,7 +785,7 @@ function queueBotReply(id, userText) {
   sendNext(0);
 }
 
-const ONBOARD_STEPS = 9;
+const ONBOARD_STEPS = 10;
 
 function wizardProgress(step) {
   return `<div class="wiz-progress" aria-hidden="true">${Array.from({ length: ONBOARD_STEPS }, (_, i) => `<i class="${i <= step ? "on" : ""}"></i>`).join("")}</div>`;
@@ -761,6 +832,15 @@ function renderOnboard() {
       </div>
       <div class="wiz-nav">${back}${next}</div>`;
   } else if (onboardStep === 4) {
+    body = `<h2>Sexuality</h2><p>Used to filter people who would actually match with you.</p>
+      <div class="choice-col">
+        ${ORIENTATIONS.map(
+          ([v, l]) =>
+            `<button type="button" class="choice ${u.orientation === v ? "on" : ""}" data-set="orientation" data-v="${v}">${l}</button>`
+        ).join("")}
+      </div>
+      <div class="wiz-nav">${back}${next}</div>`;
+  } else if (onboardStep === 5) {
     body = `<h2>Show me</h2>
       <div class="choice-col">
         ${[
@@ -775,11 +855,11 @@ function renderOnboard() {
           .join("")}
       </div>
       <div class="wiz-nav">${back}${next}</div>`;
-  } else if (onboardStep === 5) {
+  } else if (onboardStep === 6) {
     body = `<h2>Your photos</h2><p>Add at least one. Six slots, like a real profile — compressed for GitHub.</p>
       ${photoGridHtml("onboard")}
       <div class="wiz-nav">${back}${next}</div>`;
-  } else if (onboardStep === 6) {
+  } else if (onboardStep === 7) {
     body = `<h2>Prompts</h2><p>Answer at least one. This is what people comment on.</p>
       ${u.prompts
         .map(
@@ -790,7 +870,7 @@ function renderOnboard() {
         )
         .join("")}
       <div class="wiz-nav">${back}${next}</div>`;
-  } else if (onboardStep === 7) {
+  } else if (onboardStep === 8) {
     body = `<h2>The basics</h2>
       <label class="stack">City<input class="field" data-f="city" value="${esc(u.city)}" /></label>
       <label class="stack">Job title<input class="field" data-f="job" value="${esc(u.job)}" placeholder="Software engineer" /></label>
@@ -805,7 +885,7 @@ function renderOnboard() {
       </label>
       <div class="wiz-nav">${back}${next}</div>`;
   } else {
-    body = `<h2>Save your board</h2><p>Optional. Skip if you only want this browser. Connect GitHub to keep the profile after you upload the site.</p>
+    body = `<h2>Save your board</h2><p>Optional. Paste a GitHub token and hit Connect — that's it. Skip if you only want this phone/browser.</p>
       ${githubFieldsHtml()}
       <div class="wiz-nav">${back}<button type="button" class="btn-primary" data-wiz="done">Start discovering</button></div>`;
   }
@@ -857,8 +937,9 @@ function validateStep(step) {
   const u = state.user;
   if (step === 1 && !u.name.trim()) return "Add your first name";
   if (step === 2 && (!u.age || u.age < 18)) return "Age must be 18+";
-  if (step === 5 && !userPhotos().length) return "Add at least one photo";
-  if (step === 6 && !u.prompts.some((p) => p.a.trim())) return "Answer at least one prompt";
+  if (step === 4 && !u.orientation) return "Pick your sexuality";
+  if (step === 6 && !userPhotos().length) return "Add at least one photo";
+  if (step === 7 && !u.prompts.some((p) => p.a.trim())) return "Answer at least one prompt";
   return "";
 }
 
@@ -869,9 +950,15 @@ function finishOnboard() {
     renderOnboard();
     return;
   }
+  if (!state.user.orientation) {
+    toast("Pick your sexuality");
+    onboardStep = 4;
+    renderOnboard();
+    return;
+  }
   if (!userPhotos().length) {
     toast("Add at least one photo");
-    onboardStep = 5;
+    onboardStep = 6;
     renderOnboard();
     return;
   }

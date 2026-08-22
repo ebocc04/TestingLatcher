@@ -1,18 +1,5 @@
-/* Conversation engine: follows the last beat, not random templates. */
+/* Replies to what you said — vibe first, then a follow-up on the same beat. */
 (function (global) {
-  const STYLE = {
-    playful: { laugh: "lol okay", warm: "I'm smiling at my phone.", push: "Don't make me like you this fast." },
-    dry: { laugh: "Ha.", warm: "That's not nothing.", push: "You might be interesting." },
-    warm: { laugh: "That made me laugh.", warm: "That's really sweet.", push: "I like talking to you." },
-    thoughtful: { laugh: "That's funny in a specific way.", warm: "I like how you said that.", push: "We could talk for a while." },
-    direct: { laugh: "Ha. Okay.", warm: "I like that.", push: "We'd have a good time." },
-    witty: { laugh: "I'm keeping that.", warm: "You're quick. I like quick.", push: "We'd be annoying together in the best way." },
-    soft: { laugh: "That's cute. I'm shy about it.", warm: "That's tender.", push: "I want to keep talking." },
-    easy: { laugh: "You're funnier than your photos.", warm: "This is easy. I like easy.", push: "Alright I'm invested." },
-    grounded: { laugh: "Okay that was good.", warm: "That's a real answer.", push: "You're making this feel less like an app." },
-    quiet: { laugh: "That was a good one.", warm: "I like your pace.", push: "We might be compatible. Quietly." }
-  };
-
   const PERSONA = {
     maya: "playful",
     jordan: "dry",
@@ -43,170 +30,175 @@
     return "";
   }
 
-  function usedSet(thread) {
+  function used(thread) {
     return new Set((thread || []).filter((m) => m.from === "them").map((m) => m.text));
   }
 
-  function unused(options, thread) {
-    const used = usedSet(thread);
-    const fresh = options.filter((x) => x && !used.has(x));
-    return pick(fresh.length ? fresh : options);
+  function fresh(options, thread) {
+    const seen = used(thread);
+    const pool = options.filter((x) => x && !seen.has(x));
+    return pick(pool.length ? pool : options);
   }
 
-  function has(t, re) {
-    return re.test(t);
+  function clip(text) {
+    const t = String(text || "").trim().replace(/\s+/g, " ");
+    if (t.length <= 48) return t;
+    return t.slice(0, 45).replace(/[,.;:!?\s]+$/, "") + "…";
   }
 
-  function analyze(userText, thread) {
-    const t = userText.toLowerCase();
-    const them = last(thread, "them").toLowerCase();
-    const teasing =
-      has(t, /\b(though|or what|or nah|or just|don't you|aren't you|am i|are you the|you the)\b/) ||
-      has(t, /\bsnack\b/) ||
-      has(t, /\b(menu|dessert|package deal)\b/);
+  function topics(text) {
+    const t = text.toLowerCase();
+    const found = [];
+    const map = [
+      ["hike", /\b(hik|trail|outdoors?|greenbelt|backpack|nature walk)\b/],
+      ["snack", /\b(snack|trail mix|granola)\b/],
+      ["food", /\b(taco|dinner|lunch|eat|hungry|dumpling|pastry|cookie|dessert|cook|food)\b/],
+      ["coffee", /\b(coffee|latte|espresso|cafe)\b/],
+      ["drink", /\b(wine|beer|drink|bar|negroni)\b/],
+      ["music", /\b(music|album|song|vinyl|concert|record|playlist)\b/],
+      ["work", /\b(work|job|shift|office|startup)\b/],
+      ["date", /\b(hang out|get dinner|this week|meet up|go out|free friday|saturday)\b/],
+      ["dog", /\b(dog|puppy|rescue)\b/],
+      ["movie", /\b(movie|film|imdb)\b/],
+      ["plant", /\b(plant|flower|garden|tomato)\b/]
+    ];
+    map.forEach(([name, re]) => {
+      if (re.test(t)) found.push(name);
+    });
+    return found;
+  }
+
+  function vibe(text, them) {
+    const t = text.toLowerCase();
+    const tease = /\b(though|or what|or nah|aren't you|are you the|you the|snack)\b/.test(t);
     const flirt =
-      teasing ||
-      has(t, /\b(cute|hot|sexy|beautiful|handsome|pretty|gorgeous|into you|crush|kiss|date me|take you|steal you|smooth|charming|flirt|attracted)\b/) ||
-      has(t, /\bare you\b.*\b(free|single|the)\b/);
-    const joke =
-      teasing ||
-      has(t, /\b(haha|hahaha|lol|lmao|jk|lmaoo|funny|joke|kidding|bit\b|💀|😂|😭)\b/) ||
-      (flirt && userText.includes("?"));
-    const hike = has(t, /\b(hik|trail|outdoors?|nature|greenbelt|walk|backpack)\b/) || has(them, /\b(hik|trail|snack)\b/);
-    const food = has(t, /\b(snack|taco|coffee|food|dinner|lunch|eat|hungry|dumpling|pastry|cookie|dessert|cook|wine|drink)\b/);
-    const dateAsk = has(t, /\b(hang out|get dinner|get drinks|this week|free\b|down to|meet up|go out|when can)\b/);
-    const greeting = has(t, /^(hey|hi|hello|yo|sup|what'?s up)\b/) && t.length < 24;
-    const realQ =
-      userText.includes("?") &&
-      !teasing &&
-      has(t, /\b(what|where|when|why|how|which|do you|did you|are you|favorite|who)\b/);
-    return { t, them, teasing, flirt, joke, hike, food, dateAsk, greeting, realQ };
+      tease ||
+      /\b(cute|hot|sexy|beautiful|handsome|pretty|gorgeous|into you|crush|kiss|date me|smooth|flirt)\b/.test(t);
+    const joke = tease || /\b(haha|lol|lmao|jk|kidding|funny|💀|😂)\b/.test(t) || (flirt && text.includes("?"));
+    const greet = /^(hey|hi|hello|yo|sup|what'?s up)\b/i.test(text.trim()) && text.trim().length < 22;
+    const realQ = text.includes("?") && !tease && /\b(what|where|when|why|how|which|do you|did you|favorite|who)\b/i.test(t);
+    const dateAsk = /\b(hang out|get dinner|get drinks|this week|meet up|go out|when are you free)\b/i.test(t);
+    return { t, them: (them || "").toLowerCase(), tease, flirt, joke, greet, realQ, dateAsk, topics: topics(text + " " + (them || "")) };
   }
 
-  function topicReply(p, a) {
+  function answer(p, t) {
+    if (/\b(job|work|do for a living)\b/.test(t)) return `I'm a ${p.job.toLowerCase()}. Off the clock I'm less impressive and more fun.`;
+    if (/\b(live|city|where are you)\b/.test(t)) return `${p.city} — you?`;
+    if (/\b(age|old are you)\b/.test(t)) return `${p.age}. Don't make it weird.`;
+    if (/\b(looking for|serious|casual|want)\b/.test(t)) return `${p.intention}. That's the honest version.`;
+    if (/\bsexuality|orientation|straight|gay|lesbian|bi\b/.test(t)) {
+      return `I'm ${p.orientation}. If that works for you, keep talking.`;
+    }
+    return "";
+  }
+
+  function keywordHit(p, t) {
     const keys = Object.entries(p.voice.keywords || {});
-    const hits = keys.filter(([k]) => a.t.includes(k) || a.them.includes(k));
-    if (hits.length) return hits[0][1];
-    return "";
-  }
-
-  function answerFromProfile(p, t) {
-    if (has(t, /\b(job|work|do for a living)\b/)) return `I ${p.job.toLowerCase().startsWith("i ") ? p.job : "work as " + p.job.toLowerCase()}. Off the clock I'm more fun, I promise.`;
-    if (has(t, /\b(live|city|where)\b/)) return `${p.city}. You?`;
-    if (has(t, /\b(age|old)\b/)) return `${p.age}. Why, you writing a census?`;
-    if (has(t, /\b(looking for|want|serious|casual)\b/)) return p.intention + ". Matching energy preferred.";
-    if (has(t, /\bfavorite\b/) && has(t, /\b(food|eat|dish)\b/)) return topicReply(p, { t: "food taco", them: "" }) || "Whatever's salty and shared.";
-    return "";
+    const hit = keys.find(([k]) => t.includes(k));
+    return hit ? hit[1] : "";
   }
 
   function converse(p, userText, thread) {
-    const a = analyze(userText, thread);
-    const s = STYLE[PERSONA[p.id] || "warm"];
-    const lines = [];
+    const them = last(thread, "them");
+    const v = vibe(userText, them);
+    const bit = clip(userText);
+    const style = PERSONA[p.id] || "warm";
 
-    if (a.greeting) {
-      lines.push(unused([pick(p.voice.greet), `Hey — ${s.warm}`], thread));
-      return { lines, vibe: "warm" };
+    if (v.greet) {
+      return { lines: [fresh([pick(p.voice.greet), `Hey. ${p.prompts[0].a.split(".")[0]}.`], thread)] };
     }
 
-    if (a.flirt && (a.food || a.hike || a.teasing)) {
-      lines.push(
-        unused(
-          [
-            "I said better snacks, not that I'd be the trail dessert. I'm also not *not* saying that.",
-            "Wow. You went straight there. I'm choosing to be charmed.",
-            "Depends. I pack well — and yes, I heard what I just said.",
-            "That's shameless. Keep going, I can take a joke if it's good.",
-            "Okay you're the hiking and the bit. I'll allow it."
-          ],
-          thread
-        )
-      );
-      lines.push(
-        unused(
-          [
-            "So: actual hike, or do you only flirt about the outdoors?",
-            "Greenbelt this weekend? I'll bring real food too, don't worry.",
-            "If we go, you're carrying the bag. That's the tax on that line."
-          ],
-          thread
-        )
-      );
-      return { lines: lines.slice(0, Math.random() < 0.7 ? 2 : 1), vibe: "flirty" };
-    }
-
-    if (a.flirt || a.joke) {
-      lines.push(
-        unused(
-          [
-            s.laugh + " That landed.",
-            s.warm + " You're doing a bit and it's working.",
-            "Okay that was smooth. I'm not mad about it.",
-            pick(p.voice.reply),
-            "You're funnier in the chat than people usually are. Dangerous."
-          ],
-          thread
-        )
-      );
-      if (a.realQ || a.teasing) {
-        lines.push(unused(["Yes. Next question.", "I mean… kinda. Don't get cocky yet.", "I'll take the fifth until the second date."], thread));
-      }
-      return { lines: lines.slice(0, a.teasing ? 2 : 1), vibe: "flirty" };
-    }
-
-    if (a.dateAsk) {
-      lines.push(
-        unused(
-          [
-            "I'm free after work most evenings. Walk + something to eat is my default.",
-            "Yes. Let's actually do it — this week, not 'sometime.'",
-            "I like a plan with wiggle room. You pick the day, I'll pick the place."
-          ],
-          thread
-        )
-      );
-      return { lines, vibe: "date" };
-    }
-
-    if (a.realQ) {
-      const answered = answerFromProfile(p, a.t) || topicReply(p, a);
-      lines.push(
-        answered ||
-          unused(
+    if (v.flirt && (v.topics.includes("snack") || v.topics.includes("hike") || v.tease)) {
+      return {
+        lines: [
+          fresh(
             [
-              `On that: ${p.prompts[0].a}`,
-              "Short answer: yes. Longer answer over a drink.",
-              `Mostly ${p.city} things. I'll get specific if you do.`
+              `"${bit}" is insane and I'm not mad about it.`,
+              "I said better snacks. I did not say I wasn't on the menu. You're welcome.",
+              "Wow. You went for it. I'm choosing to be charmed.",
+              "Keep the joke coming — that's the version of you I want on a trail."
+            ],
+            thread
+          ),
+          fresh(
+            [
+              "So are we actually hiking, or was that just the pickup?",
+              "Greenbelt this weekend. I'll bring real food too.",
+              "You're carrying the bag. That's the tax on that line."
             ],
             thread
           )
-      );
-      lines.push(unused(["Your turn — give me a real one back.", "Okay I answered. Don't leave me hanging."], thread));
-      return { lines, vibe: "curious" };
+        ].slice(0, Math.random() < 0.75 ? 2 : 1)
+      };
     }
 
-    const topical = topicReply(p, a);
-    if (topical && !usedSet(thread).has(topical)) {
-      lines.push(topical);
-      return { lines, vibe: "topic" };
-    }
-
-    if (userText.trim().length < 10) {
-      lines.push(unused(["That's it? Give me the rest of the thought.", "Go on…", "Okay but say more. I like when people commit."], thread));
-      return { lines, vibe: "nudge" };
-    }
-
-    lines.push(
-      unused(
+    if (v.flirt || v.joke) {
+      const line = fresh(
         [
-          s.warm + " " + pick(["Tell me the last thing that actually made your week.", "What do you do when you're not on this app?", p.prompts[1]?.a ? `Unrelated: ${p.prompts[1].a}` : "Keep talking."]),
-          pick(p.voice.reply),
-          `${s.push} What does a good ${["Thursday", "Sunday", "weeknight"][Math.floor(Math.random() * 3)]} look like for you?`
+          `Okay "${bit}" landed. Don't get cocky yet.`,
+          "That's funny. I'm smiling at my phone like a loser.",
+          "You're doing a bit and it's working.",
+          pick(p.voice.reply)
         ],
         thread
-      )
-    );
-    return { lines: [lines[0]], vibe: "continue" };
+      );
+      const extra = v.tease
+        ? fresh(["I mean… kinda. Next question.", "I'll take the fifth until drinks."], thread)
+        : null;
+      return { lines: extra ? [line, extra] : [line] };
+    }
+
+    if (v.dateAsk) {
+      return {
+        lines: [
+          fresh(
+            [
+              "Yes. This week, not 'sometime.' Walk + something to eat.",
+              "I'm free most evenings after work. You pick the night.",
+              "Let's actually do it. I'll bring a plan with wiggle room."
+            ],
+            thread
+          )
+        ]
+      };
+    }
+
+    if (v.realQ) {
+      const a = answer(p, v.t) || keywordHit(p, v.t);
+      return {
+        lines: [
+          a || `On that — ${p.prompts[0].a}`,
+          fresh(["Your turn. Ask me something worse.", "Okay I answered. Don't leave me hanging."], thread)
+        ]
+      };
+    }
+
+    const topical = keywordHit(p, v.t) || (v.topics[0] && keywordHit(p, v.topics[0]));
+    if (topical) {
+      return {
+        lines: [
+          `${style === "dry" ? "Yeah." : "Okay."} ${topical}`,
+          fresh([`You said "${bit}" — I want the rest of that.`, "Keep going. That actually interested me."], thread)
+        ].slice(0, 2)
+      };
+    }
+
+    if (userText.trim().length < 8) {
+      return { lines: [fresh(["That's it? Give me the rest.", "Go on…", "Say the interesting part."], thread)] };
+    }
+
+    return {
+      lines: [
+        fresh(
+          [
+            `"${bit}" — I like how you talk. ${pick(p.voice.reply)}`,
+            `Got it. ${p.prompts[1] ? p.prompts[1].a : "Tell me what a good weeknight looks like."}`,
+            pick(p.voice.reply) + ` What made you say that?`
+          ],
+          thread
+        )
+      ]
+    };
   }
 
   global.latchConverse = converse;

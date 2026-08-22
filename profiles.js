@@ -1,12 +1,9 @@
-/* All portraits are Unsplash photos (Unsplash License). People are fictional.
-   Each profile uses ONE source photo with different crops so identity stays consistent. */
-function latchShots(photoId) {
-  const base = `https://images.unsplash.com/${photoId}`;
-  return [
-    `${base}?auto=format&fit=crop&w=900&h=1125&q=80&crop=faces&fp-y=0.22`,
-    `${base}?auto=format&fit=crop&w=900&h=1200&q=80&fp-x=0.5&fp-y=0.4`,
-    `${base}?auto=format&fit=crop&w=900&h=1125&q=80&crop=entropy&fp-y=0.58`
-  ];
+/* Licensed Unsplash + Pexels photoshoots. Each person is a real multi-photo set, not crops. */
+function unsplash(ids) {
+  return ids.map((id) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&h=1150&q=80`);
+}
+function pexels(ids) {
+  return ids.map((id) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=900`);
 }
 
 window.LATCH_PROFILES = [
@@ -15,6 +12,7 @@ window.LATCH_PROFILES = [
     name: "Maya",
     age: 27,
     gender: "women",
+    orientation: "bisexual",
     city: "Austin",
     job: "Product designer at a climate startup",
     school: "RISD",
@@ -23,7 +21,11 @@ window.LATCH_PROFILES = [
     standout: true,
     likesYou: true,
     likeNote: "Your hiking prompt — same, but I bring better snacks.",
-    photos: latchShots("photo-1534528741775-53994a69daeb"),
+    photos: unsplash([
+      "photo-1571513722275-4b41940f54b8",
+      "photo-1571513721963-d855fd8df4c2",
+      "photo-1571513800374-df1bbe650e56"
+    ]),
     prompts: [
       { q: "A life goal of mine", a: "Have a garden that actually produces tomatoes, not just vibes." },
       { q: "The way to win me over is", a: "Plan a walk with no destination and a playlist we both pretend we made." },
@@ -51,6 +53,7 @@ window.LATCH_PROFILES = [
     name: "Jordan",
     age: 29,
     gender: "men",
+    orientation: "gay",
     city: "Austin",
     job: "Sound engineer",
     school: "UT Austin",
@@ -58,7 +61,7 @@ window.LATCH_PROFILES = [
     intention: "Open to whatever",
     standout: true,
     likesYou: false,
-    photos: latchShots("photo-1500648767791-00dcc994a43e"),
+    photos: pexels([2379004, 2379005, 2379006]),
     prompts: [
       { q: "I'll fall for you if", a: "You can sit through a whole record without checking your phone." },
       { q: "My simple pleasures", a: "Late-night diner coffee and a booth nobody wants." },
@@ -86,6 +89,7 @@ window.LATCH_PROFILES = [
     name: "Priya",
     age: 26,
     gender: "women",
+    orientation: "straight",
     city: "Austin",
     job: "ER nurse",
     school: "Texas State",
@@ -94,7 +98,7 @@ window.LATCH_PROFILES = [
     standout: false,
     likesYou: true,
     likeNote: "Liked your 'Sunday morning' prompt.",
-    photos: latchShots("photo-1544005313-94ddf0286df2"),
+    photos: pexels([1181686, 1181519, 1181424]),
     prompts: [
       { q: "I want someone who", a: "Can handle a 12-hour story and still wants to hear the rest." },
       { q: "Typical Sunday", a: "Farmers market, overcaffeinated, maybe a nap I pretend I earned." },
@@ -122,6 +126,7 @@ window.LATCH_PROFILES = [
     name: "Leo",
     age: 31,
     gender: "men",
+    orientation: "straight",
     city: "Austin",
     job: "Architect",
     school: "Rice",
@@ -130,7 +135,7 @@ window.LATCH_PROFILES = [
     standout: true,
     likesYou: true,
     likeNote: "Your photo in the bookstore. I do that too, I just pretend I'm browsing.",
-    photos: latchShots("photo-1506794778202-cad84cf45f1d"),
+    photos: pexels([1043471, 1043473, 1043474]),
     prompts: [
       { q: "I'm looking for", a: "Someone who notices good light in a room and also knows when to leave a party." },
       { q: "Don't hate me if I", a: "Stop walking to look at a building like it's a celebrity." },
@@ -158,6 +163,7 @@ window.LATCH_PROFILES = [
     name: "Nina",
     age: 24,
     gender: "women",
+    orientation: "bisexual",
     city: "Austin",
     job: "Pastry cook",
     school: "Culinary Institute",
@@ -165,7 +171,11 @@ window.LATCH_PROFILES = [
     intention: "Figuring it out",
     standout: false,
     likesYou: false,
-    photos: latchShots("photo-1529626455594-4ff0802cfb7e"),
+    photos: unsplash([
+      "photo-1543654916-8071f17ee466",
+      "photo-1543654916-24cb93a9e817",
+      "photo-1543654916-52cb2192d8c2"
+    ]),
     prompts: [
       { q: "I'll pick the place if", a: "You pick the dessert. That's a personality test, sorry." },
       { q: "Green flags I look for", a: "You talk to service staff like they're people. Bar is on the floor." },
@@ -193,6 +203,7 @@ window.LATCH_PROFILES = [
     name: "Andre",
     age: 33,
     gender: "men",
+    orientation: "straight",
     city: "Austin",
     job: "High school basketball coach",
     school: "Texas A&M",
@@ -201,7 +212,7 @@ window.LATCH_PROFILES = [
     standout: false,
     likesYou: true,
     likeNote: "You seem like you'd trash-talk in a friendly way. I respect that.",
-    photos: latchShots("photo-1507003211169-0a1dd7228f2d"),
+    photos: pexels([428353, 428361, 428364]),
     prompts: [
       { q: "I'm overly competitive about", a: "Board games, pickup, and who gets the better parking spot." },
       { q: "Let's debate", a: "Whether a first date should have a plan or a vibe." },
@@ -229,6 +240,7 @@ window.LATCH_PROFILES = [
     name: "Sofia",
     age: 28,
     gender: "women",
+    orientation: "lesbian",
     city: "Austin",
     job: "Documentary editor",
     school: "NYU",
@@ -236,7 +248,7 @@ window.LATCH_PROFILES = [
     intention: "Looking for something serious",
     standout: true,
     likesYou: false,
-    photos: latchShots("photo-1494790108377-be9c29b29330"),
+    photos: pexels([1130623, 1130624, 1130626]),
     prompts: [
       { q: "I'm convinced that", a: "The best dates end with 'wait, one more story.'"},
       { q: "My love language is", a: "Voice notes that are way too long and photos of weird signs." },
@@ -264,6 +276,7 @@ window.LATCH_PROFILES = [
     name: "Kai",
     age: 25,
     gender: "men",
+    orientation: "bisexual",
     city: "Austin",
     job: "Environmental scientist",
     school: "Colorado State",
@@ -271,7 +284,7 @@ window.LATCH_PROFILES = [
     intention: "Open to whatever",
     standout: false,
     likesYou: false,
-    photos: latchShots("photo-1463453091185-61582044d556"),
+    photos: pexels([2182970, 2182971, 2182972]),
     prompts: [
       { q: "Typical Sunday", a: "Trail in the morning, something fried after, zero guilt." },
       { q: "The dumber the better", a: "Roadside attractions. I will pull over for a giant peach." },
@@ -299,6 +312,7 @@ window.LATCH_PROFILES = [
     name: "Elena",
     age: 30,
     gender: "women",
+    orientation: "straight",
     city: "Austin",
     job: "Immigration lawyer",
     school: "UT Law",
@@ -307,7 +321,7 @@ window.LATCH_PROFILES = [
     standout: true,
     likesYou: true,
     likeNote: "You seem thoughtful. That's the whole app for me.",
-    photos: latchShots("photo-1531746020798-e6953c6c4f2e"),
+    photos: pexels([1036623, 1036622, 1036627]),
     prompts: [
       { q: "I'm looking for", a: "A partner, not a project, not a placeholder." },
       { q: "The key to my heart is", a: "Curiosity without an interrogation vibe." },
@@ -335,6 +349,7 @@ window.LATCH_PROFILES = [
     name: "Omar",
     age: 27,
     gender: "men",
+    orientation: "straight",
     city: "Austin",
     job: "Chef de partie",
     school: "None, learned in kitchens",
@@ -342,7 +357,7 @@ window.LATCH_PROFILES = [
     intention: "Figuring it out",
     standout: false,
     likesYou: false,
-    photos: latchShots("photo-1519085360753-af0119f7cbe7"),
+    photos: pexels([1516681, 1516682, 1516683]),
     prompts: [
       { q: "I'll fall for you if", a: "You can hang in a loud kitchen and still be gentle after." },
       { q: "My simple pleasures", a: "Family meal at 4pm and a cold drink on the back dock." },
@@ -370,6 +385,7 @@ window.LATCH_PROFILES = [
     name: "Avery",
     age: 26,
     gender: "women",
+    orientation: "queer",
     city: "Austin",
     job: "UX researcher",
     school: "UChicago",
@@ -378,7 +394,7 @@ window.LATCH_PROFILES = [
     standout: false,
     likesYou: true,
     likeNote: "Your prompt about bad first dates made me laugh out loud on a bus.",
-    photos: latchShots("photo-1488426862026-3ee34a7d66df"),
+    photos: pexels([1462637, 1462638, 1462640]),
     prompts: [
       { q: "The hallmark of a good relationship is", a: "Inside jokes that would make no sense in a deposition." },
       { q: "I'm overly competitive about", a: "Trivia. It's a problem. I have a spreadsheet. That's two problems." },
@@ -406,6 +422,7 @@ window.LATCH_PROFILES = [
     name: "Mateo",
     age: 32,
     gender: "men",
+    orientation: "straight",
     city: "Austin",
     job: "Photojournalist",
     school: "SVA",
@@ -413,7 +430,7 @@ window.LATCH_PROFILES = [
     intention: "Looking for something serious",
     standout: true,
     likesYou: false,
-    photos: latchShots("photo-1492562080023-ab3db95bfbce"),
+    photos: pexels([8090140, 8090141, 8090142]),
     prompts: [
       { q: "I want someone who", a: "Sees the same strange details I do and doesn't need them explained." },
       { q: "Together we could", a: "Get lost on purpose and call it research." },
@@ -441,6 +458,7 @@ window.LATCH_PROFILES = [
     name: "Hana",
     age: 23,
     gender: "women",
+    orientation: "bisexual",
     city: "Austin",
     job: "Florist",
     school: "ACC",
@@ -448,7 +466,7 @@ window.LATCH_PROFILES = [
     intention: "Figuring it out",
     standout: false,
     likesYou: false,
-    photos: latchShots("photo-1487412720507-e7ab37603c6f"),
+    photos: pexels([775358, 775359, 775360]),
     prompts: [
       { q: "The way to win me over is", a: "Bring me a weird grocery-store flower and commit to the bit." },
       { q: "My simple pleasures", a: "Early shop, quiet, stems in buckets, a song on repeat." },
@@ -476,6 +494,7 @@ window.LATCH_PROFILES = [
     name: "Devon",
     age: 34,
     gender: "men",
+    orientation: "gay",
     city: "Austin",
     job: "Startup PM, recovering musician",
     school: "Berkeley",
@@ -484,7 +503,7 @@ window.LATCH_PROFILES = [
     standout: false,
     likesYou: true,
     likeNote: "You seem like you'd call me on my nonsense. Please do.",
-    photos: latchShots("photo-1472099645785-5658abf4ff4e"),
+    photos: pexels([937481, 937482, 937483]),
     prompts: [
       { q: "I'm looking for", a: "Someone who makes weeknights feel like they count." },
       { q: "I'll fall for you if", a: "You have a point of view and you can change it." },
@@ -512,6 +531,7 @@ window.LATCH_PROFILES = [
     name: "Luca",
     age: 29,
     gender: "men",
+    orientation: "bisexual",
     city: "Austin",
     job: "Barista / ceramicist",
     school: "Self-taught",
@@ -519,7 +539,7 @@ window.LATCH_PROFILES = [
     intention: "Open to whatever",
     standout: true,
     likesYou: false,
-    photos: latchShots("photo-1539571696357-5a69c17a67c6"),
+    photos: pexels([1222271, 1222272, 1222273]),
     prompts: [
       { q: "Dating me is like", a: "Slow mornings, clay on everything, and I will remember how you take your coffee." },
       { q: "Green flags I look for", a: "You have a craft, even a tiny one." },
@@ -547,6 +567,7 @@ window.LATCH_PROFILES = [
     name: "Sasha",
     age: 27,
     gender: "women",
+    orientation: "lesbian",
     city: "Austin",
     job: "Policy analyst",
     school: "Georgetown",
@@ -554,7 +575,7 @@ window.LATCH_PROFILES = [
     intention: "Looking for something serious",
     standout: false,
     likesYou: false,
-    photos: latchShots("photo-1524504388940-b1c1722653e1"),
+    photos: pexels([91227, 91228, 91229]),
     prompts: [
       { q: "Let's make sure we're on the same page about", a: "Ambition that still leaves room for a Tuesday night on the couch." },
       { q: "The one thing I'd love to know about you", a: "What you do when you're not trying to impress anyone." },
