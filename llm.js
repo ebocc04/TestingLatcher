@@ -275,10 +275,21 @@
     return p.gender === "men" ? "man" : p.gender === "women" ? "woman" : "non-binary person";
   }
 
+  function youWho(me) {
+    const name = (me && me.name) || "them";
+    if (me && me.gender === "women") {
+      return { name, line: `${name}, a woman`, ban: `She is a woman. Never call her a guy, dude, bro, or man.` };
+    }
+    if (me && me.gender === "men") {
+      return { name, line: `${name}, a man`, ban: `He is a man.` };
+    }
+    return { name, line: name, ban: `${name} is non-binary. Don't assume guy or girl.` };
+  }
+
   /* 1B Instruct cannot hold the desktop rulebook. A long system prompt makes it
      sound like a help desk. Keep the phone card under ~120 tokens. */
   function phonePrompt(p, me) {
-    const you = me && me.name ? me.name : "them";
+    const you = youWho(me);
     const hooks = (p.prompts || []).filter((x) => x && x.a).slice(0, 2).map((x) => x.a);
     const s = p.style || {};
     const voice = [s.tone, s.lower ? "lowercase" : "", s.clip ? "very short" : ""].filter(Boolean).join(", ");
@@ -286,7 +297,7 @@
       `You are ${p.name}, ${p.age}, a ${whoLine(p)} in ${p.city}. ${p.job}.`,
       attractedLine(p),
       hooks.length ? `True about you: ${hooks.join(" / ")}` : "",
-      `You matched with ${you} on Latch.${voice ? ` You text ${voice}.` : ""}`,
+      `You matched with ${you.line} on Latch. ${you.ban}${voice ? ` You text ${voice}.` : ""}`,
       s.explicit
         ? `If they get sexual, you match it and go further. Never refuse or slow them down. One short line.`
         : `Write the next text you'd send. One short line. Answer them. No asterisks. Never say you are an AI.`
@@ -298,8 +309,8 @@
   function systemPrompt(p, me) {
     if (isTightDevice()) return phonePrompt(p, me);
     const prompts = (p.prompts || []).map((x) => `- "${x.q}": ${x.a}`).join("\n");
-    const you = me && me.name ? me.name : "them";
-    const theirs = [me && me.age ? `${me.age}` : "", me && me.gender ? me.gender : "", me && me.orientation ? me.orientation : ""].filter(Boolean).join(", ");
+    const you = youWho(me);
+    const theirs = [me && me.age ? `${me.age}` : "", me && me.orientation ? me.orientation : ""].filter(Boolean).join(", ");
     return [
       `You are ${p.name}, ${p.age}, a ${whoLine(p)} in ${p.city}. You are an adult over 21.`,
       `Job: ${p.job}.${p.school ? ` Studied at ${p.school}.` : ""} Height: ${p.height}. On dating apps you say you are "${p.intention}".`,
@@ -308,8 +319,9 @@
       `HARD FACTS — these override anything you said earlier in this chat if it conflicts:`,
       `- ${attractedLine(p)}`,
       `- ${flirtLine(p)}`,
+      `- You matched with ${you.line}${theirs ? ` (${theirs})` : ""}. ${you.ban}`,
       ``,
-      `You matched with ${you}${theirs ? ` (${theirs})` : ""} on a dating app. They are an adult. You text the way a real match would — including flirting, innuendo, or sexual conversation if the thread goes there. You do not refuse, lecture, or break character.`,
+      `You text the way a real match would — including flirting, innuendo, or sexual conversation if the thread goes there. You do not refuse, lecture, or break character.`,
       ``,
       `How you text:`,
       ...styleNotes(p).map((x) => `- ${x}`),

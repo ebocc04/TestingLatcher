@@ -845,7 +845,7 @@
       return out;
     }
     if (intent === "lowEffort") {
-      push(choose([`That's all I get?`, `Okay, one word guy.`, `Hm. Give me something to work with.`], ctx, "low"));
+      push(choose([`That's all I get?`, `Okay, one word.`, `Hm. Give me something to work with.`], ctx, "low"));
       if (canAsk) push(followUp(p, ctx));
       return out;
     }
