@@ -60,6 +60,11 @@
         "from": "them",
         "text": "That's all I get?",
         "ts": 1787365246786
+      },
+      {
+        "from": "me",
+        "text": "My bad lol, was trying to be flirty. Guess that didn’t work",
+        "ts": 1787365259069
       }
     ]
   },
@@ -107,7 +112,7 @@
   "unmatched": [
     "nina"
   ],
-  "updatedAt": 1787365247688,
+  "updatedAt": 1787365259973,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
