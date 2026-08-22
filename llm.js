@@ -485,27 +485,6 @@
       : { temperature: 0.95, max_tokens: 160 };
   }
 
-  async function salvagePhone(engine, p, thread, me) {
-    const last = lastUserText(thread) || "hey";
-    let hint = "";
-    try {
-      if (typeof latchConverse === "function") {
-        hint = (latchConverse(p, last, thread, me).lines || []).join(" ");
-      }
-    } catch (_) {}
-    const data = await engine.chat.completions.create({
-      messages: [
-        { role: "system", content: phonePrompt(p, me) },
-        {
-          role: "user",
-          content: `${(me && me.name) || "They"} just said: ${last}\n${p.name} texts back in one line. No thanks, no how-are-you.${hint ? ` Riff on this, don't copy it: ${hint}` : ""}`
-        }
-      ],
-      ...localOpts(true)
-    });
-    return scrubLocal(extractText(data).text, p);
-  }
-
   async function reply(p, thread, me) {
     if (!active()) return null;
     const messages = toMessages(p, thread, me);
@@ -515,11 +494,7 @@
       const data = await engine.chat.completions.create({ messages, ...localOpts(phone) });
       let { text } = extractText(data);
       text = scrubLocal(text, p);
-      if (phone && (isRefusal(text) || isWeird(text))) {
-        try {
-          text = await salvagePhone(engine, p, thread, me);
-        } catch (_) {}
-      }
+      /* Don't run a second generate on phones — that OOM-kills the tab. */
       if (phone && (isRefusal(text) || isWeird(text)) && typeof latchConverse === "function") {
         const salvage = latchConverse(p, lastUserText(thread), thread, me).lines;
         if (salvage && salvage.length) return salvage;
