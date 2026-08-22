@@ -1,44 +1,57 @@
 /* Conversation engine.
 
-   A reply is planned, not sampled. Each turn we read the intent of your message,
-   rebuild what this person already knows about you from the thread, then pick a
-   sequence of moves (react / answer / offer / ask). Two rules keep it from feeling
-   like a bot: a direct question always gets a direct answer, and only one move per
-   turn is allowed to be a question, so nobody interrogates you.
+   Every reply is planned against the whole thread, not the last message. Before
+   answering we re-read the conversation: what you've told this person, what they
+   already told you, which of your questions they still owe an answer to, what's
+   been agreed about meeting up, and how much energy you're bringing. Only then do
+   we choose moves (answer / react / disclose / offer / ask).
 
-   Voice is applied last, as a fixed per-person transform, so a given match always
-   texts with the same energy, casing and punctuation habits. */
+   The rules that keep it from reading like a bot:
+     - a question always gets a real answer, including one you asked two messages ago
+     - nothing already said in this thread gets said again
+     - one question per turn, never two turns running, never right after they asked one
+     - no praising your message instead of engaging with it, and never quoting you back
+     - line choice is seeded on the state of the thread, so a reply is reproducible
+       rather than a fresh dice roll every render
+
+   Voice is applied last as a fixed per-person transform, so a match always texts
+   with the same casing, punctuation and emoji habits. */
 (function (global) {
   const VOICE = {
-    maya: { tone: "playful", bang: 0.35, emoji: ["🙂"], emojiRate: 0.12, double: 0.45 },
-    jordan: { tone: "dry", bang: 0, double: 0.15, clip: true },
-    priya: { tone: "warm", bang: 0.5, emoji: ["😂", "🙂"], emojiRate: 0.2, double: 0.4 },
-    leo: { tone: "thoughtful", bang: 0.1, double: 0.2 },
-    nina: { tone: "playful", lower: true, bang: 0.3, emoji: ["😭", "🙃"], emojiRate: 0.28, double: 0.6, clip: true },
-    andre: { tone: "direct", bang: 0.25, double: 0.2, clip: true },
-    sofia: { tone: "thoughtful", bang: 0.05, double: 0.25 },
-    kai: { tone: "easy", lower: true, bang: 0.2, emoji: ["🙂"], emojiRate: 0.1, double: 0.35 },
-    elena: { tone: "grounded", bang: 0.15, double: 0.2 },
-    omar: { tone: "direct", bang: 0.4, double: 0.3, clip: true },
-    avery: { tone: "witty", bang: 0.2, double: 0.4 },
-    mateo: { tone: "thoughtful", bang: 0.1, double: 0.2 },
-    hana: { tone: "soft", bang: 0.3, emoji: ["🌷", "🙂"], emojiRate: 0.3, ellipsis: 0.3, double: 0.45 },
-    devon: { tone: "dry", bang: 0.1, double: 0.2 },
-    luca: { tone: "quiet", lower: true, bang: 0.05, ellipsis: 0.35, double: 0.2, clip: true },
-    sasha: { tone: "warm", bang: 0.35, emoji: ["🙂"], emojiRate: 0.12, double: 0.35 }
+    maya: { tone: "playful", bang: 0.35, emoji: ["🙂"], emojiRate: 0.12 },
+    jordan: { tone: "dry", bang: 0, clip: true },
+    priya: { tone: "warm", bang: 0.5, emoji: ["😂", "🙂"], emojiRate: 0.2 },
+    leo: { tone: "thoughtful", bang: 0.1 },
+    nina: { tone: "playful", lower: true, bang: 0.3, emoji: ["😭", "🙃"], emojiRate: 0.28, clip: true },
+    andre: { tone: "direct", bang: 0.25, clip: true },
+    sofia: { tone: "thoughtful", bang: 0.05 },
+    kai: { tone: "easy", lower: true, bang: 0.2, emoji: ["🙂"], emojiRate: 0.1 },
+    elena: { tone: "grounded", bang: 0.15 },
+    omar: { tone: "direct", bang: 0.4, clip: true },
+    avery: { tone: "witty", bang: 0.2 },
+    mateo: { tone: "thoughtful", bang: 0.1 },
+    hana: { tone: "soft", bang: 0.3, emoji: ["🌷", "🙂"], emojiRate: 0.3, ellipsis: 0.3 },
+    devon: { tone: "dry", bang: 0.1 },
+    luca: { tone: "quiet", lower: true, bang: 0.05, ellipsis: 0.35, clip: true },
+    sasha: { tone: "warm", bang: 0.35, emoji: ["🙂"], emojiRate: 0.12 }
   };
 
-  const DEFAULT_VOICE = { tone: "warm", bang: 0.25, double: 0.3 };
+  const DEFAULT_VOICE = { tone: "warm", bang: 0.25 };
 
-  const DAY_ASKS = [
-    `How's your day actually going?`,
-    `What kind of day are you having?`,
-    `Good day or a get-me-out-of-here day?`
-  ];
+  /* p.style holds per-person overrides from the admin sheet. Empty strings mean
+     "keep the original", so they're stripped before merging. */
+  function voiceOf(p) {
+    const base = VOICE[p.id] || DEFAULT_VOICE;
+    if (!p.style) return base;
+    const over = {};
+    Object.entries(p.style).forEach(([k, val]) => {
+      if (val !== "" && val !== undefined && val !== null) over[k] = val;
+    });
+    const merged = { ...base, ...over };
+    if (over.emojiRate !== undefined && !merged.emoji) merged.emoji = ["🙂"];
+    return merged;
+  }
 
-  const rand = (n) => Math.floor(Math.random() * n);
-  const pick = (a) => a[rand(a.length)];
-  const chance = (p) => Math.random() < p;
   const norm = (s) =>
     String(s || "")
       .toLowerCase()
@@ -46,62 +59,129 @@
       .replace(/\s+/g, " ")
       .trim();
   const shape = (s) => norm(s).split(" ").slice(0, 5).join(" ");
+  const words = (s) => norm(s).split(" ").filter(Boolean);
 
-  /* Prefer wording this person hasn't used yet in this thread. */
-  function fresh(options, thread) {
-    const said = new Set((thread || []).filter((m) => m.from === "them").map((m) => shape(m.text)));
-    const open = options.filter((o) => o && !said.has(shape(o)));
-    return pick(open.length ? open : options.filter(Boolean));
+  function hash(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i += 1) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
   }
 
-  function quote(text) {
-    const t = String(text || "").trim().replace(/\s+/g, " ");
-    return t.length <= 42 ? t : t.slice(0, 39).replace(/[,.;:!?\s]+$/, "") + "…";
+  /* Deterministic on the state of the thread: the same conversation always gets the
+     same reply, so a match reads as consistent instead of randomised. Anything this
+     person already said in this thread drops out of the pool. */
+  function choose(options, ctx, salt) {
+    const pool = options.filter(Boolean);
+    if (!pool.length) return "";
+    const open = pool.filter((o) => !ctx.said.has(shape(o)));
+    const use = open.length ? open : pool;
+    return use[hash(`${ctx.key}|${salt}`) % use.length];
+  }
+
+  const roll = (ctx, salt, p) => hash(`${ctx.key}|${salt}`) % 100 < Math.round(p * 100);
+
+  /* ---------- what counts as what ---------- */
+
+  const GENDERS = [
+    ["women", /\b(women|woman|girls?|female|females|ladies|lady|chicks?)\b/i],
+    ["men", /\b(men|man|guys?|male|males|dudes?|boys?)\b/i],
+    ["nonbinary", /\b(non-?binary|nb|enby)\b/i]
+  ];
+
+  const genderIn = (text) => (GENDERS.find(([, re]) => re.test(text || "")) || [""])[0];
+
+  const ORIENT_LABEL = {
+    straight: "straight",
+    gay: "gay",
+    lesbian: "a lesbian",
+    bisexual: "bi",
+    pansexual: "pan",
+    queer: "queer"
+  };
+
+  function attractedTo(p) {
+    const o = String(p.orientation || "").toLowerCase();
+    if (o === "straight") return new Set([p.gender === "men" ? "women" : "men"]);
+    if (o === "gay") return new Set([p.gender === "women" ? "women" : "men"]);
+    if (o === "lesbian") return new Set(["women"]);
+    return new Set(["women", "men", "nonbinary"]);
   }
 
   const RE = {
     greet: /^(hey+|hi+|hello|yo|sup|howdy|what'?s up|whats up|morning|good morning|evening)\b/i,
     bye: /\b(goodnight|good ?night|gtg|got to go|gotta go|talk later|talk tomorrow|heading out|i'?m out|ttyl)\b|\bnight[.!\s]*$/i,
-    lowEffort: /^(k|ok|okay|kk|lol|lmao|haha+|hah|nice|cool|word|same|true|fr|fair|yeah|yep|yup|sure|nothing much|nm|hbu|wbu|you\?|u\?)[.!?]*$/i,
-    plans: /\b(hang out|hangout|grab (a |some )?(drink|drinks|coffee|dinner|food|bite)|get (drinks|dinner|coffee|food)|meet up|link up|see you|free (this|on|next|tonight|tomorrow)|this week|this weekend|tomorrow|tonight|friday|saturday|sunday|when are you free|what are you doing)\b/i,
-    flirt: /\b(cute|hot|sexy|beautiful|gorgeous|handsome|adorable|smooth|charming|into you|crush|kiss|flirt|dangerous|trouble|out of my league|marry)\b/i,
-    tease: /\b(or nah|or what|are you the|you the|sure about that|bold|confident|allegedly|prove it|says you)\b|\bare you\b.*\bthough\b/i,
+    lowEffort: /^(k|ok|okay|kk|lol|lmao|haha+|hah|nice|cool|word|same|true|fr|fair|yeah|yep|yup|sure|nothing much|nm|hbu|wbu)[.!?]*$/i,
+    plans: /\b(hang out|hangout|meet up|link up|free (this|on|next|tonight|tomorrow)|this weekend|when are you free)\b|\b(we should|let'?s|wanna|want to|down to|up for)\b[^.?!]{0,24}\b(grab|get|do|try|hit|go|meet|see)\b|\b(grab|get)\b[^.?!]{0,12}\b(drinks?|coffee|dinner|lunch|food|bite|tacos?|beer)\b/i,
+    flirt: /\b(cute|hot|sexy|beautiful|gorgeous|handsome|adorable|smooth|charming|into you|crush|kiss|flirt|dangerous|trouble|out of my league|marry|my type|your type)\b/i,
+    tease: /\b(or nah|or what|sure about that|bold|confident|allegedly|prove it|says you)\b|\bare you the\b/i,
     joke: /(\b(haha+|hah|lol|lmao|lmfao|jk|kidding|joking|dying|deceased|screaming)\b|💀|😂|🤣|😭)/i,
-    compliment: /\b(you seem|you'?re (funny|cool|sweet|interesting|smart|great|the best)|i like (you|that|your)|good (answer|taste|point)|well played)\b/i,
+    compliment: /\b(you seem|you'?re (funny|cool|sweet|interesting|smart|great|the best)|i like (you|your)|good (answer|taste|point)|well played)\b/i,
     negative: /\b(not really|nah|no thanks|not interested|meh|i'?m good|maybe not|too busy|don'?t think so)\b/i,
     sexual: /\b(nudes|nude|sex|hookup|hook up|dtf|netflix and chill|in bed|naked|smash)\b/i,
     thanks: /\b(thank you|thanks|ty|appreciate it)\b/i,
     aboutThem: /\b(you|your|u|ur|yours)\b/i,
     day: /\b(mon|tues|wednes|thurs|fri|satur|sun)day\b|\btonight\b|\btomorrow\b/i,
-    /* Plenty of people skip the question mark. */
     impliedQ: /\b(do|did|are|is|can|could|would|have|whats|what'?s|hows|how'?s)\s+(you|u|ur|your)\b/i,
-    confirm: /\b(works|works for me|sounds good|i'?m free|let'?s do|down for|deal|perfect|see you then|what time|where at|where should we|where do you want|which place)\b|\bwhere\b.*\?/i,
-    /* "you?" is a request to answer my own question back at me. */
-    bounce: /^(you|u|hbu|wbu|and you|what about you|yourself)\s*\??$/i
+    confirm: /\b(works|works for me|sounds good|i'?m free|let'?s do|down for|deal|perfect|see you then|what time|where at|where should we|where do you want|which place)\b/i,
+    /* "you?" hands my question back to me. "are you?" is still aimed at me — those
+       need opposite answers, so they're matched separately. */
+    nudgeAsk: /^(so |well |and )?(are|do|did|is|have|can|would|will)\s+(you|u)\s*\??$/i,
+    nudge: /^(and )?(you|u|hbu|wbu|yourself|so|well|and|but)\s*\??$|^\?+$/i,
+    eitherOr: /\b([a-z]{3,})\s+or\s+([a-z]{3,})\b/i
   };
 
+  /* A question, however it's punctuated. Order matters: first match wins. */
   const QUESTIONS = [
-    [/\bhow (are|r) (you|u)\b|\bhow'?s it going\b|\bhow (was|is) your day\b|\bhow you doing\b/i, "howAreYou"],
-    [/\bwhat do you do\b|\byour job\b|\bwhat'?s your job\b|\bfor a living\b|\bwhat do you work\b/i, "job"],
-    [/\bwhere (do you|you) live\b|\bwhere are you (from|based)\b|\bwhat part of town\b/i, "city"],
-    [/\bhow old\b|\byour age\b/i, "age"],
-    [/\bwhat are you looking for\b|\bhere for\b|\bserious or\b|\bwhat do you want\b/i, "intention"],
-    [/\bwhat'?s your name\b|\byour name\b/i, "name"],
-    [/\bhow (long|many).*(hinge|app|apps|here)\b|\bnew (to|on) (this|hinge|apps)\b/i, "apps"],
-    [/\bweekend\b.*\?|\bwhat are you up to\b|\bplans (this|for)\b/i, "weekend"],
-    [/\b(where did you|did you) (go to school|study)\b|\byour school\b|\bcollege\b/i, "school"],
-    [/\bhow tall\b|\byour height\b/i, "height"],
-    [/\b(favou?rite|favorite) (food|restaurant|place to eat)\b|\bbest taco\b/i, "food"],
-    [/\b(favou?rite|favorite) (music|band|artist|album|song)\b|\bwhat do you listen to\b/i, "music"],
-    [/\b(favou?rite|favorite) (movie|film|show)\b|\bwhat do you watch\b/i, "movie"],
-    [/\bpets?\b|\bdo you have a (dog|cat)\b/i, "pets"],
-    [/\bwhat'?s your (deal|story)\b|\btell me about you\b|\byourself\b/i, "story"]
+    [
+      "orientation",
+      /\b(are|r) (you|u) (bi|bisexual|straight|gay|lesbian|queer|pan)\b|\b(you|u|ur|your|you'?re|youre)\b[^.?!]{0,24}\b(into|like|likes|date|dating|attracted to|go for)\b[^.?!]{0,16}\b(women|woman|men|man|girls?|guys?|dudes?|boys?|ladies|non-?binary|nb)\b|\byour (sexuality|orientation)\b|\bwhich way do you\b/i
+    ],
+    ["type", /\b(my|i'?m your|am i your) type\b|\bwhat'?s your type\b|\bwhat are you into\b/i],
+    ["howAreYou", /\bhow (are|r) (you|u)\b|\bhow'?s it going\b|\bhow (was|is) your day\b|\bhow you doing\b/i],
+    ["job", /\bwhat do you do\b|\byour job\b|\bwhat'?s your job\b|\bfor a living\b|\bwhere do you work\b/i],
+    ["city", /\bwhere (do you|you) live\b|\bwhere are you (from|based)\b|\bwhat part of town\b/i],
+    ["age", /\bhow old\b|\byour age\b/i],
+    ["intention", /\bwhat are you looking for\b|\bhere for\b|\bserious or\b|\bwhat do you want\b/i],
+    ["name", /\bwhat'?s your name\b|\byour name\b/i],
+    ["apps", /\bhow (long|many).*(hinge|app|apps|here)\b|\bnew (to|on) (this|hinge|apps)\b/i],
+    ["weekend", /\bweekend\b.*\?|\bwhat are you up to\b|\bplans (this|for)\b/i],
+    ["school", /\b(where did you|did you) (go to school|study)\b|\byour school\b|\bcollege\b/i],
+    ["height", /\bhow tall\b|\byour height\b/i],
+    ["food", /\b(favou?rite|favorite) (food|restaurant|place to eat)\b|\bbest taco\b/i],
+    ["music", /\b(favou?rite|favorite) (music|band|artist|album|song)\b|\bwhat do you listen to\b/i],
+    ["movie", /\b(favou?rite|favorite) (movie|film|show)\b|\bwhat do you watch\b/i],
+    ["pets", /\bpets?\b|\bdo you have a (dog|cat)\b/i],
+    ["story", /\bwhat'?s your (deal|story)\b|\btell me about you\b|\byourself\b/i]
   ];
 
   function askedWhat(text) {
-    const hit = QUESTIONS.find(([re]) => re.test(text));
-    return hit ? hit[1] : "";
+    const t = String(text || "");
+    /* "I'm into women" is them telling me about themselves, not asking. */
+    const hit = QUESTIONS.find(([, re]) => re.test(t));
+    return hit ? hit[0] : "";
   }
+
+  const TOPICS = [
+    ["hike", /\b(hik(e|ing)|trail|greenbelt|outdoors?|camp(ing)?|backpack)\b/i],
+    ["coffee", /\b(coffee|latte|espresso|cafe|cold brew)\b/i],
+    ["taco", /\b(taco|tacos|breakfast taco)\b/i],
+    ["food", /\b(dinner|lunch|cook(ing)?|food|restaurant|eat|pizza|dumpling|pastry|dessert|bbq|ramen|sushi|noodles?|burger|brunch|bakery|menu|cookie|croissant)\b/i],
+    ["drink", /\b(beer|wine|whiskey|negroni|cocktail|bar|brewery)\b/i],
+    ["music", /\b(music|band|album|song|vinyl|record|concert|playlist|guitar)\b/i],
+    ["work", /\b(work|job|shift|office|startup|deadline|meeting|client|code|coding|engineer)\b/i],
+    ["dog", /\b(dog|puppy|rescue|cat)\b/i],
+    ["movie", /\b(movie|film|show|series|watching)\b/i],
+    ["plant", /\b(plant|flower|garden|tomato)\b/i],
+    ["travel", /\b(travel|trip|flight|abroad|vacation)\b/i],
+    ["run", /\b(run(ning)?|gym|lift|climb(ing)?|yoga|bike|basketball|soccer)\b/i],
+    ["book", /\b(book|reading|novel|author)\b/i],
+    ["sleep", /\b(tired|sleep|nap|exhausted|insomnia)\b/i]
+  ];
+
+  const topicOf = (text) => (TOPICS.find(([, re]) => re.test(text || "")) || [""])[0];
 
   const ADJ_STOP = /^(little|bit|lot|big|huge|small|fan|mess|bad|good|great|nice|sorry|tired|hungry|bored|busy|fine|ok|okay|weirdo|idiot)\b/i;
   const CLAUSE_STOP = /^(so|and|but|because|who|that|which|then|though|right|now|today|at|in|for|with|from|on|to)$/i;
@@ -118,136 +198,229 @@
     return out.join(" ").toLowerCase();
   }
 
-  /* What this person could reasonably remember about you from the thread. */
-  function memory(thread) {
-    const mine = (thread || []).filter((m) => m.from === "me");
-    const text = mine.map((m) => m.text).join("\n");
-    const m = {
-      turns: mine.length,
+  /* Does this line of mine actually answer that kind of question? Used to work out
+     what I still owe them, so "are you?" two messages later lands correctly. */
+  function answers(p, kind, text) {
+    const t = String(text || "").toLowerCase();
+    switch (kind) {
+      case "orientation":
+        return /\b(bi|bisexual|straight|gay|lesbian|queer|pan)\b/.test(t) || /\bincluded\b/.test(t);
+      case "type":
+        return /\btype\b|\bincluded\b|\binto\b/.test(t);
+      case "job":
+        return words(p.job).some((w) => w.length > 3 && t.includes(w));
+      case "city":
+        return t.includes(String(p.city).toLowerCase());
+      case "age":
+        return t.includes(String(p.age));
+      case "height":
+        return t.includes(String(p.height).replace(/["']/g, "").slice(0, 1));
+      case "school":
+        return !p.school || t.includes(String(p.school).toLowerCase());
+      case "intention":
+        return t.includes(String(p.intention).toLowerCase().slice(0, 14));
+      default:
+        /* No signature to check: assume the reply dealt with it rather than nagging. */
+        return true;
+    }
+  }
+
+  /* ---------- reading the whole thread ---------- */
+
+  function readThread(p, thread, userText, me) {
+    const all = (thread || []).filter((m) => m && m.text);
+    /* app.js appends your message before asking for a reply; don't count it twice. */
+    const history = all.length && all[all.length - 1].from === "me" && all[all.length - 1].text === userText ? all.slice(0, -1) : all;
+    const mine = history.filter((m) => m.from === "me");
+    const theirs = history.filter((m) => m.from === "them");
+    const myText = mine.map((m) => m.text).concat(userText || "").join("\n");
+
+    const ctx = {
+      key: `${p.id}:${history.length}`,
+      me: me || null,
+      turns: mine.length + 1,
+      said: new Set(theirs.map((m) => shape(m.text))),
+      theirs,
       facts: {},
-      topic: "",
-      lastAsk: ""
+      answeredKinds: new Set(),
+      pendingAsk: ""
     };
 
     let hit;
-    if ((hit = /\bi(?:'m| am|m)\s+(?:a|an)\s+((?:[a-z\-]+ ?){1,3})/i.exec(text)) && !ADJ_STOP.test(hit[1])) {
-      m.facts.job = phrase(hit[1]);
+    if ((hit = /\bi(?:'m| am|m)\s+(?:a|an)\s+((?:[a-z\-]+ ?){1,3})/i.exec(myText)) && !ADJ_STOP.test(hit[1])) {
+      ctx.facts.job = phrase(hit[1]);
     }
-    if ((hit = /\bi\s+work\s+(?:as|at|in|for)\s+(?:a |an |the )?((?:[a-z\-]+ ?){1,3})/i.exec(text))) {
-      m.facts.job = m.facts.job || phrase(hit[1]);
+    if ((hit = /\bi\s+work\s+(?:as|at|in|for)\s+(?:a |an |the )?((?:[a-z\-]+ ?){1,3})/i.exec(myText))) {
+      ctx.facts.job = ctx.facts.job || phrase(hit[1]);
     }
-    if ((hit = /\bi\s+live\s+in\s+([a-z][a-z \-]{2,20})/i.exec(text))) m.facts.city = hit[1].trim();
-    const likes = [...text.matchAll(/\bi\s+(?:really\s+)?(?:love|like|am into|'m into)\s+((?:[a-z\-]+ ?){1,3})/gi)]
+    if ((hit = /\bi\s+live\s+in\s+([a-z][a-z \-]{2,20})/i.exec(myText))) ctx.facts.city = hit[1].trim();
+    const likes = [...myText.matchAll(/\bi\s+(?:really\s+)?(?:love|like|am into|'m into)\s+((?:[a-z\-]+ ?){1,3})/gi)]
       .map((x) => phrase(x[1]))
       .filter((x) => x && !ADJ_STOP.test(x));
-    if (likes.length) m.facts.like = likes[likes.length - 1];
+    if (likes.length) ctx.facts.like = likes[likes.length - 1];
 
-    /* Only the last couple of messages count as "what we're talking about" —
-       a trail mentioned eight messages ago is not the current topic. */
-    m.topic = mine
-      .slice(-2)
-      .map((x) => topicOf(x.text))
+    /* Topics in order, so the bot can pick up something from earlier instead of only
+       reacting to the last line. */
+    ctx.topic = topicOf(userText);
+    ctx.history = mine
+      .map((m) => topicOf(m.text))
       .filter(Boolean)
-      .pop() || "";
+      .filter((t) => t !== ctx.topic);
+    ctx.earlier = ctx.history.length ? ctx.history[ctx.history.length - 1] : "";
+    ctx.anyTopic = ctx.topic || ctx.earlier;
 
-    const theirs = (thread || []).filter((x) => x.from === "them");
-    m.askedRecently = theirs.slice(-2).some((x) => x.text.includes("?"));
-    m.lastAsk = theirs.length && theirs[theirs.length - 1].text.includes("?") ? theirs[theirs.length - 1].text : "";
-    m.said = new Set(theirs.map((x) => shape(x.text)));
-    /* A plan is on the table only once a day or time has been floated — an opener
-       that happens to mention coffee is not a date. */
-    m.planned = theirs.some((x) =>
-      /\b(mon|tues|wednes|thurs|fri|satur|sun)day\b|\btonight\b|\btomorrow\b|\bthis week\b|\bweekend\b|\d\s?(ish|pm)/i.test(x.text)
-    );
-    /* Fall back to whatever the conversation has been about when the last message
-       is pure logistics with no subject of its own. */
-    m.anyTopic = (thread || [])
-      .map((x) => topicOf(x.text))
-      .filter(Boolean)
-      .pop() || "";
-    return m;
+    /* Every question of theirs, and whether any of my later lines actually answered
+       it. The most recent unanswered one is what "are you?" refers to. */
+    let pending = "";
+    history.forEach((m, i) => {
+      if (m.from !== "me") return;
+      const kind = askedWhat(m.text);
+      if (!kind) return;
+      ctx.lastAskKind = kind;
+      const replied = history.slice(i + 1, i + 4).filter((x) => x.from === "them");
+      if (replied.some((x) => answers(p, kind, x.text))) ctx.answeredKinds.add(kind);
+      else pending = kind;
+    });
+    ctx.pendingAsk = pending;
+
+    const lastTheirs = theirs.length ? theirs[theirs.length - 1].text : "";
+    /* "Croissant or cookie." is a question with a full stop on it. */
+    ctx.eitherOr = RE.eitherOr.exec(lastTheirs);
+    ctx.botAskedLast = /\?/.test(lastTheirs) || !!ctx.eitherOr;
+    ctx.botAsk = ctx.botAskedLast ? lastTheirs : "";
+    ctx.askedRecently = theirs.slice(-2).some((m) => m.text.includes("?"));
+
+    /* Match their energy: short texters get short replies. */
+    const lens = mine.concat([{ text: userText || "" }]).map((m) => String(m.text).length);
+    ctx.avgLen = lens.reduce((a, b) => a + b, 0) / (lens.length || 1);
+    ctx.brief = ctx.avgLen < 26;
+    ctx.flirtLevel = mine.filter((m) => RE.flirt.test(m.text)).length + (RE.flirt.test(userText || "") ? 1 : 0);
+
+    /* A plan exists once a day or a time has been floated by either of us. */
+    const planText = history.map((m) => m.text).join("\n");
+    ctx.planned = /\b(mon|tues|wednes|thurs|fri|satur|sun)day\b|\btonight\b|\btomorrow\b|\bthis week\b|\bweekend\b|\d\s?(ish|pm)/i.test(planText);
+    ctx.venueSet = theirs.some((m) => /\b(place|spot|bar|trailhead|patio|table)\b/i.test(m.text));
+    ctx.stage = ctx.turns <= 1 ? "open" : ctx.turns <= 4 ? "warming" : "flowing";
+    return ctx;
   }
 
-  const TOPICS = [
-    ["hike", /\b(hik(e|ing)|trail|greenbelt|outdoors?|camp(ing)?|backpack)\b/i],
-    ["coffee", /\b(coffee|latte|espresso|cafe|cold brew)\b/i],
-    ["taco", /\b(taco|tacos|breakfast taco)\b/i],
-    ["food", /\b(dinner|lunch|cook(ing)?|food|restaurant|eat|pizza|dumpling|pastry|dessert|bbq|ramen|sushi|noodles?|burger|brunch|bakery|menu)\b/i],
-    ["drink", /\b(beer|wine|whiskey|negroni|cocktail|bar|brewery)\b/i],
-    ["music", /\b(music|band|album|song|vinyl|record|concert|show|playlist|guitar)\b/i],
-    ["work", /\b(work|job|shift|office|startup|deadline|meeting|client|code|coding|engineer)\b/i],
-    ["dog", /\b(dog|puppy|rescue|cat)\b/i],
-    ["movie", /\b(movie|film|show|series|watching)\b/i],
-    ["plant", /\b(plant|flower|garden|tomato)\b/i],
-    ["travel", /\b(travel|trip|flight|abroad|vacation)\b/i],
-    ["run", /\b(run(ning)?|gym|lift|climb(ing)?|yoga|bike|basketball|soccer)\b/i],
-    ["book", /\b(book|reading|novel|author)\b/i],
-    ["sleep", /\b(tired|sleep|nap|exhausted|insomnia)\b/i]
-  ];
+  /* ---------- intent ---------- */
 
-  function topicOf(text) {
-    const hit = TOPICS.find(([, re]) => re.test(text || ""));
-    return hit ? hit[0] : "";
-  }
-
-  function intentOf(text, mem) {
+  function classify(text, ctx) {
     const t = String(text || "").trim();
     if (RE.bye.test(t)) return "bye";
     if (RE.sexual.test(t)) return "sexual";
-    /* Once a meet-up is on the table, day names mean logistics, not a fresh invite. */
-    if (mem.planned && (RE.day.test(t) || RE.confirm.test(t) || RE.plans.test(t))) return "logistics";
+    /* A nudge means: answer the thing I already asked you. */
+    if (RE.nudgeAsk.test(t)) return ctx.pendingAsk ? "pending" : "reaffirm";
+    if (RE.nudge.test(t) && ctx.pendingAsk) return "pending";
+    if (askedWhat(t)) return "asked";
+    /* "friday works" is logistics whether or not a day was named before. */
+    if ((ctx.planned || RE.confirm.test(t)) && (RE.day.test(t) || RE.confirm.test(t))) return "logistics";
+    if (ctx.planned && RE.plans.test(t)) return "logistics";
     if (RE.plans.test(t)) return "plans";
-    if (RE.bounce.test(t) || (/\b(you|u)\s*\?$/i.test(t) && t.length < 26)) return "bounce";
+    if (RE.nudge.test(t)) return "bounce";
     if (RE.lowEffort.test(t)) return "lowEffort";
-    if (RE.greet.test(t) && t.length < 24 && mem.turns <= 1) return "greet";
-    /* A teasing question is a flirt, not a request for information. */
-    if (RE.tease.test(t) || (RE.flirt.test(t) && t.length < 70)) return "flirt";
-    if (t.includes("?") || RE.impliedQ.test(t)) return RE.aboutThem.test(t) ? "askMe" : "question";
-    if (RE.flirt.test(t)) return "flirt";
+    if (RE.greet.test(t) && t.length < 24 && ctx.turns <= 1) return "greet";
+    if (t.includes("?") || RE.impliedQ.test(t)) return "asked";
+    if (RE.tease.test(t) || RE.flirt.test(t)) return "flirt";
     if (RE.compliment.test(t)) return "compliment";
     if (RE.joke.test(t)) return "joke";
     if (RE.negative.test(t)) return "cool";
     if (RE.thanks.test(t)) return "thanks";
-    if (mem.lastAsk) return "answered";
+    if (ctx.botAskedLast) return "answered";
     return "statement";
   }
 
-  /* Concrete answers. A question never gets deflected — that was the old tell. */
-  function answerFor(p, kind, mem) {
+  /* ---------- answers ---------- */
+
+  function orientationAnswer(p, ctx, text) {
+    const label = ORIENT_LABEL[String(p.orientation).toLowerCase()] || String(p.orientation);
+    const set = attractedTo(p);
+    const target = genderIn(text) || (ctx.me && ctx.me.gender) || "";
+    const repeat = ctx.answeredKinds.has("orientation");
+
+    if (target && set.has(target)) {
+      if (repeat) return choose([`Still ${label}. Still yes.`, `Asked and answered — ${label}, ${target} included.`], ctx, "orient-rep");
+      return choose(
+        [
+          `${label[0].toUpperCase()}${label.slice(1)}, so yes — ${target} very much included.`,
+          `I'm ${label}. ${target[0].toUpperCase()}${target.slice(1)} are the reason I'm on here.`,
+          `Yes. ${label[0].toUpperCase()}${label.slice(1)}, and you're asking the right question.`
+        ],
+        ctx,
+        "orient-yes"
+      );
+    }
+    if (target) {
+      const mine = [...set][0];
+      return choose(
+        [`I'm ${label}, so ${mine} — sorry to be the one to say it.`, `${label[0].toUpperCase()}${label.slice(1)}, so it's ${mine} for me.`],
+        ctx,
+        "orient-no"
+      );
+    }
+    return `I'm ${label}. Not a subtle profile, that one.`;
+  }
+
+  function typeAnswer(p, ctx) {
+    const g = ctx.me && ctx.me.gender;
+    const set = attractedTo(p);
+    const yes = g && set.has(g);
+    return choose(
+      [
+        yes ? `On paper, very. In practice you keep talking like this and it's not close.` : `Honestly? Not the usual, but I'm not precious about it.`,
+        `My type is whoever answers a question properly. You're doing fine.`,
+        `Funny, sharp, does what they said they'd do. So far, yes.`
+      ],
+      ctx,
+      "type"
+    );
+  }
+
+  function answerFor(p, kind, ctx, text) {
     const first = p.prompts[0] ? p.prompts[0].a : "";
     switch (kind) {
+      case "orientation":
+        return orientationAnswer(p, ctx, text);
+      case "type":
+        return typeAnswer(p, ctx);
       case "howAreYou":
-        return pick([
-          `Good — long day, but the kind I chose. You?`,
-          `Decent. Post-work, pre-dinner, mildly feral. How about you?`,
-          `Fine, honestly. Better now that this is happening.`
-        ]);
+        return choose(
+          [
+            `Good — long day, but the kind I chose. You?`,
+            `Decent. Post-work, pre-dinner, mildly feral. How about you?`,
+            `Fine, honestly. Better now that this is happening.`
+          ],
+          ctx,
+          "how"
+        );
       case "job":
-        return `${p.job}. ${pick([
-          `Annoying parts, real parts, I like it.`,
-          `Good days and days I'd hand to anyone.`,
-          `It's more admin than people think.`,
-          `Ask me on a bad day and you'll get a different answer.`
-        ])}`;
+        return `${p.job}. ${choose(
+          [`Annoying parts, real parts, I like it.`, `Good days and days I'd hand to anyone.`, `It's more admin than people think.`],
+          ctx,
+          "job"
+        )}`;
       case "city":
-        return mem.facts.city
-          ? `${p.city}. You said ${mem.facts.city} — how far is that from me, realistically?`
-          : `${p.city}. Whereabouts are you?`;
+        return ctx.facts.city ? `${p.city}. You said ${ctx.facts.city} — how far is that, realistically?` : `${p.city}. Whereabouts are you?`;
       case "age":
         return `${p.age}.`;
       case "intention":
-        return `${p.intention}. ${pick([
-          `Rather say it now than three weeks in.`,
-          `I'm not going to pretend otherwise to seem chill.`,
-          `That's the honest version, take it or leave it.`
-        ])}`;
+        return `${p.intention}. ${choose(
+          [`Rather say it now than three weeks in.`, `I'm not going to pretend otherwise to seem chill.`],
+          ctx,
+          "intent"
+        )}`;
       case "name":
         return `${p.name}. Which you can see, but I appreciate the manners.`;
       case "apps":
-        return pick([
-          `Couple of months, on and off. I'm bad at the small talk part and good at the actual date part.`,
-          `Long enough to know I'd rather meet than type for two weeks.`
-        ]);
+        return choose(
+          [
+            `Couple of months, on and off. Bad at the small talk part, good at the actual date part.`,
+            `Long enough to know I'd rather meet than type for two weeks.`
+          ],
+          ctx,
+          "apps"
+        );
       case "weekend":
         return `Nothing locked in. ${first}`;
       case "school":
@@ -255,13 +428,13 @@
       case "height":
         return `${p.height}. The most important fact about me, clearly.`;
       case "food":
-        return p.voice.keywords.taco || p.voice.keywords.food || `Anything I didn't have to plan. I'm easy about food and picky about company.`;
+        return p.voice.keywords.taco || p.voice.keywords.food || SELF.food;
       case "music":
-        return p.voice.keywords.music || `Depends on the hour. I'll make you a playlist you'll pretend to like.`;
+        return p.voice.keywords.music || SELF.music;
       case "movie":
-        return p.voice.keywords.movie || `I rewatch the same four films instead of picking a new one. It's a flaw.`;
+        return p.voice.keywords.movie || SELF.movie;
       case "pets":
-        return p.voice.keywords.dog || `No pets, borrow other people's constantly.`;
+        return p.voice.keywords.dog || SELF.dog;
       case "story":
         return `${p.job}, ${p.city}, ${p.age}. Beyond the resume: ${first.toLowerCase()}`;
       default:
@@ -269,273 +442,8 @@
     }
   }
 
-  function reactTo(p, text, mem, intent, thread) {
-    const tone = (VOICE[p.id] || DEFAULT_VOICE).tone;
-    const dry = tone === "dry" || tone === "quiet";
-
-    if (intent === "joke") {
-      return fresh(
-        [
-          dry ? `That's funny. Annoyingly.` : `Okay that got me.`,
-          `I laughed out loud, which is embarrassing in public.`,
-          `You're funnier than your profile let on.`
-        ],
-        thread
-      );
-    }
-    if (intent === "compliment") {
-      return fresh(
-        [
-          dry ? `Careful, I'll believe you.` : `That's a nice thing to say. I'm keeping it.`,
-          `Okay, flattery noted and welcomed.`
-        ],
-        thread
-      );
-    }
-    /* Only echo a fact back on the turn they actually said it. */
-    const justSaid = mem.facts.job && String(text || "").toLowerCase().includes(mem.facts.job);
-    if (intent === "answered" && justSaid) {
-      return fresh(
-        [
-          `${mem.facts.job} — that tracks with how you type.`,
-          `Okay, ${mem.facts.job}. So you're either very organised or barely holding it together.`
-        ],
-        thread
-      );
-    }
-    return "";
-  }
-
-  /* One question per turn, and never two turns in a row. */
-  function followUp(p, mem, thread) {
-    const t = mem.topic;
-    const byTopic = {
-      hike: `What's your actual pace — talk the whole way, or silent and fast?`,
-      coffee: `Where do you go when you want to sit for two hours and not be rushed?`,
-      taco: `Okay but what's the order? Be specific.`,
-      food: `Are you a cook or a menu-scholar?`,
-      drink: `First round somewhere loud or somewhere we can hear each other?`,
-      music: `What have you had on repeat this week? No curating.`,
-      work: `Is it the good kind of busy or the kind you complain about?`,
-      dog: `Photo. Immediately. I don't make the rules.`,
-      movie: `What's the last thing you watched that you're still thinking about?`,
-      plant: `Are they thriving or are you lying to yourself?`,
-      travel: `Where were you happiest — not the prettiest, the happiest.`,
-      run: `How early are we talking, and do you make it a personality?`,
-      book: `What are you reading, and are you actually finishing it?`,
-      sleep: `What kept you up? Fun reason or bad reason?`
-    };
-    const options = [
-      t && byTopic[t],
-      mem.facts.job && mem.turns >= 3 && `What's the part of ${mem.facts.job} nobody outside it understands?`,
-      `What does a good Tuesday look like for you?`,
-      `What are you into lately that you'd talk about for an hour?`,
-      `What's something you did this week that you'd do again?`,
-      `What's the last thing that genuinely annoyed you? Small and petty preferred.`
-    ].filter(Boolean);
-    const unasked = options.filter((o) => !mem.said.has(shape(o)));
-    return unasked.length ? unasked[0] : pick(options);
-  }
-
-  function offerPlan(p, mem, thread, said) {
-    const t = topicOf(said) || mem.topic || mem.anyTopic;
-    if (t === "coffee") return `Coffee then. I know the place. Saturday morning?`;
-    if (t === "hike") return `${p.city === "Austin" ? "Greenbelt" : "Some trail"}, early, before it's an oven. Sunday?`;
-    if (t === "drink") return `One drink somewhere with a patio. Thursday?`;
-    if (t === "food" || t === "taco") return `Dinner then. I'll pick, you veto. Friday?`;
-    return fresh(
-      [
-        `Let's just do it — drink or a walk, this week. Which night is bad for you?`,
-        `I'd rather meet than type. Thursday or Saturday?`,
-        `Coffee this weekend. Low stakes, easy out if I'm a nightmare.`
-      ],
-      thread
-    );
-  }
-
-  /* Emoji and exclamation belong on a reaction, not on an answer or an invitation. */
-  function venue(p, mem, said) {
-    const spot = {
-      coffee: `There's a coffee place on the east side with a patio`,
-      drink: `Small bar off Rainey, quiet enough to actually talk`,
-      food: `Taco spot on South 1st, no line before 7`,
-      taco: `Taco spot on South 1st, no line before 7`,
-      hike: `Barton Creek trailhead, the shady side`,
-      music: `That bar on Red River with the good back room`
-    }[topicOf(said) || mem.topic || mem.anyTopic] || `A wine bar near me that isn't trying too hard`;
-    const line = `${spot}. ${pick([`7ish?`, `Say 7, and text me if you're running late.`, `Around 7 — I'll grab the table.`])}`;
-    /* Don't re-pitch a place already named. */
-    if ([...mem.said].some((s) => s.startsWith(shape(spot).split(" ").slice(0, 3).join(" ")))) {
-      return pick([`Same place I said. 7.`, `Same spot, 7. I'll get there first.`]);
-    }
-    return line;
-  }
-
-  function stylize(text, v, index) {
-    let s = String(text || "").trim();
-    if (!s) return s;
-    const reaction = !index && !/\?$/.test(s);
-    if (v.tone === "dry" || v.tone === "quiet" || v.tone === "thoughtful") {
-      s = s.replace(/!+/g, ".");
-    } else if (reaction && v.bang && /[.]$/.test(s) && chance(v.bang)) {
-      s = s.replace(/\.$/, "!");
-    }
-    if (v.ellipsis && /[.]$/.test(s) && chance(v.ellipsis)) s = s.replace(/\.$/, "…");
-    if (reaction && v.emoji && v.emojiRate && chance(v.emojiRate)) s = `${s} ${pick(v.emoji)}`;
-    if (v.lower) s = s.toLowerCase();
-    return s;
-  }
-
-  function converse(p, userText, thread) {
-    const v = VOICE[p.id] || DEFAULT_VOICE;
-    const mem = memory(thread);
-    const intent = intentOf(userText, mem);
-    const kind = askedWhat(userText);
-    const canAsk = !mem.askedRecently;
-    const lines = [];
-
-    if (intent === "bye") {
-      lines.push(fresh([`Night. This was a good one.`, `Go sleep. I'll be here, being charming later.`], thread));
-      return { lines: lines.map((l) => stylize(l, v)) };
-    }
-
-    if (intent === "sexual") {
-      lines.push(
-        fresh(
-          [
-            `Bold opener. I'm going to pretend you're funny instead.`,
-            `Slow down — buy me a drink and read a book first.`
-          ],
-          thread
-        )
-      );
-      return { lines: lines.map((l) => stylize(l, v)) };
-    }
-
-    if (intent === "greet") {
-      lines.push(fresh([`Hey you.`, `Hi — good, you made it.`, `Hey. You're the first decent conversation today.`], thread));
-      if (canAsk) lines.push(fresh(DAY_ASKS, thread));
-      return { lines: lines.map((l) => stylize(l, v)) };
-    }
-
-    if (intent === "bounce") {
-      lines.push(answerOwn(p, mem, thread));
-      return { lines: lines.map((l, i) => stylize(l, v, i)) };
-    }
-
-    if (intent === "logistics") {
-      const day = (RE.day.exec(userText) || [])[0];
-      const asksWhere = /\bwhere\b|\bwhat time\b|\bwhich place\b/i.test(userText);
-      if (day) lines.push(`${day[0].toUpperCase()}${day.slice(1).toLowerCase()} it is.`);
-      else if (!asksWhere) lines.push(`Okay, locked in.`);
-      lines.push(venue(p, mem, userText));
-      return { lines: lines.map((l, i) => stylize(l, v, i)) };
-    }
-
-    if (intent === "plans") {
-      lines.push(
-        fresh([`Yes. I was going to ask, you beat me to it.`, `Deal.`, `Finally, someone who just asks.`], thread)
-      );
-      lines.push(offerPlan(p, mem, thread, userText));
-      return { lines: lines.map((l) => stylize(l, v)) };
-    }
-
-    /* A question is answered even when it arrives wrapped in a joke. */
-    const asked = kind || (userText.includes("?") && RE.aboutThem.test(userText));
-    if (intent === "flirt" && asked) {
-      lines.push(flirtBack(p, mem, userText, thread));
-      lines.push(
-        answerFor(p, kind, mem) ||
-          keywordAnswer(p, userText) ||
-          fresh(
-            [
-              `And yes, obviously. Next question.`,
-              `I'll neither confirm nor deny until you buy me something.`,
-              `Depends how the date goes.`
-            ],
-            thread
-          )
-      );
-      return { lines: lines.map((l, i) => stylize(l, v, i)) };
-    }
-
-    if (intent === "askMe" || intent === "question") {
-      const a = answerFor(p, kind, mem) || keywordAnswer(p, userText) || `${p.prompts[0].a}`;
-      lines.push(a);
-      if (canAsk && !/\?$/.test(a) && chance(0.6)) lines.push(bounceBack(p, kind, mem, thread));
-      return { lines: lines.map((l, i) => stylize(l, v, i)) };
-    }
-
-    if (intent === "flirt") {
-      lines.push(flirtBack(p, mem, userText, thread));
-      if (mem.turns >= 3 && !mem.planned && chance(0.5)) lines.push(offerPlan(p, mem, thread, userText));
-      else if (canAsk && chance(0.4)) lines.push(followUp(p, mem, thread));
-      return { lines: lines.map((l, i) => stylize(l, v, i)) };
-    }
-
-    if (intent === "lowEffort") {
-      const flat = fresh([`That's all I get?`, `Okay, one word guy.`, `Hm. Give me something to work with.`], thread);
-      lines.push(v.clip ? flat : `${flat}`);
-      if (canAsk) lines.push(followUp(p, mem, thread));
-      return { lines: lines.map((l) => stylize(l, v)) };
-    }
-
-    if (intent === "cool") {
-      lines.push(fresh([`Fair enough. No pressure from me.`, `All good. I'd rather you say that than fake it.`], thread));
-      return { lines: lines.map((l) => stylize(l, v)) };
-    }
-
-    if (intent === "thanks") {
-      lines.push(fresh([`Anytime.`, `Of course.`], thread));
-      return { lines: lines.map((l) => stylize(l, v)) };
-    }
-
-    /* Whatever they just said outranks anything remembered from earlier. */
-    const topical = keywordAnswer(p, userText);
-    const react = reactTo(p, userText, mem, intent, thread);
-    if (react) lines.push(react);
-    if (topical) lines.push(topical);
-    if (!lines.length) lines.push(mirror(p, userText, mem, thread));
-
-    if (canAsk && lines.length < 3 && chance(0.7)) lines.push(followUp(p, mem, thread));
-
-    return { lines: lines.slice(0, chance(v.double) ? 3 : 2).map((l, i) => stylize(l, v, i)) };
-  }
-
-  /* They lobbed my own question back, so answer it. */
-  function answerOwn(p, mem, thread) {
-    const ask = (mem.lastAsk || "").toLowerCase();
-    if (/day|going/.test(ask)) {
-      return fresh(
-        [
-          `Long, but it's ending better than it started.`,
-          `Mine was fine. Busy, then quiet, which is my preferred order.`,
-          `Good, actually. Off work, on the couch, talking to you.`
-        ],
-        thread
-      );
-    }
-    if (/looking for/.test(ask)) return `${p.intention}. Same question, same honesty.`;
-    if (/tuesday|weeknight|week/.test(ask)) return p.prompts[1] ? p.prompts[1].a : `Quiet, usually. I like a slow evening.`;
-    const topical = mem.anyTopic && SELF[mem.anyTopic];
-    return topical || fresh([`Same, honestly. Low-key week, nothing exciting.`, `Not much either. That's why this is nice.`], thread);
-  }
-
-  function flirtBack(p, mem, userText, thread) {
-    const heat = mem.turns >= 4;
-    return fresh(
-      [
-        heat ? `You're going to make this very easy for me, aren't you.` : `Smooth. I'm choosing to be charmed.`,
-        chance(0.3) ? `"${quote(userText)}" — noted, filed, reread.` : `That worked, and I'm annoyed it worked.`,
-        heat ? `Keep talking like that and I'll clear my Thursday.` : `You're doing a bit and it's landing.`,
-        `Okay, confident. I'm into it.`
-      ],
-      thread
-    );
-  }
-
-  /* Said in their own words when a question lands outside the profile's keywords.
-     Better a plausible answer than a prompt pasted in as a non-answer. */
+  /* Said in their own words when a question lands outside the profile's keywords —
+     a plausible answer beats pasting a prompt in as a non-answer. */
   const SELF = {
     coffee: `Iced americano, extra shot, regardless of the weather. I'm not proud of it.`,
     taco: `Migas, corn tortilla, too much salsa. I have opinions about the salsa.`,
@@ -547,57 +455,362 @@
     dog: `No dog, and I say hello to every single one. It's a problem.`,
     work: `Busy in the normal way. It pays for the fun parts.`,
     book: `Two started, one finished, that's my average.`,
-    run: `Three times a week if I'm being honest, five if I'm lying.`,
+    run: `Three times a week if I'm honest, five if I'm lying.`,
     travel: `Anywhere I can walk all day and eat badly.`,
     plant: `Alive, mostly. One is thriving out of spite.`,
     sleep: `Late, and I regret it every morning at six.`
   };
 
+  /* Profile keywords, matched on whole words so "are you" can't trip a "bar" entry. */
   function keywordAnswer(p, text) {
-    const t = String(text || "").toLowerCase();
-    const entries = Object.entries(p.voice.keywords || {});
-    const hit = entries.find(([k]) => t.includes(k));
+    const t = String(text || "");
+    const entries = Object.entries((p.voice && p.voice.keywords) || {});
+    const hit = entries.find(([k]) => new RegExp(`\\b${k.replace(/[^a-z0-9]/gi, "")}\\w*\\b`, "i").test(t));
     if (hit) return hit[1];
-    const topic = topicOf(text);
+    const topic = topicOf(t);
     if (!topic) return "";
     const byTopic = entries.find(([k]) => k === topic);
     return byTopic ? byTopic[1] : SELF[topic] || "";
   }
 
-  function bounceBack(p, kind, mem, thread) {
-    if (kind === "job" && !mem.facts.job) return `What about you — what do you do all day?`;
-    if (kind === "city" && !mem.facts.city) return `Where are you?`;
-    if (kind === "howAreYou") return `And you? Real answer, not "good."`;
-    if (kind === "intention") return `What are you looking for? Same honesty rules.`;
-    return followUp(p, mem, thread);
+  /* Volunteer something instead of complimenting their message. Real people trade
+     information; bots hand out gold stars. */
+  function disclose(p, ctx) {
+    const topical = ctx.anyTopic && SELF[ctx.anyTopic];
+    const prompts = (p.prompts || []).map((x) => x.a);
+    return choose([topical, ...prompts], ctx, "disclose");
   }
 
-  /* Nothing matched: engage with the substance of what they said. */
-  function mirror(p, userText, mem, thread) {
-    const words = norm(userText).split(" ").filter(Boolean);
-    if (words.length <= 3) return fresh([`Say more.`, `Go on…`], thread);
+  const FOLLOW_UP = {
+    hike: `What's your actual pace — talk the whole way, or silent and fast?`,
+    coffee: `Where do you go when you want to sit for two hours and not be rushed?`,
+    taco: `Okay but what's the order? Be specific.`,
+    food: `Are you a cook or a menu-scholar?`,
+    drink: `First round somewhere loud or somewhere we can hear each other?`,
+    music: `What have you had on repeat this week? No curating.`,
+    work: `Is it the good kind of busy or the kind you complain about?`,
+    dog: `Photo. Immediately. I don't make the rules.`,
+    movie: `What's the last thing you watched that you're still thinking about?`,
+    plant: `Are they thriving or are you lying to yourself?`,
+    travel: `Where were you happiest — not the prettiest, the happiest.`,
+    run: `How early are we talking, and do you make it a personality?`,
+    book: `What are you reading, and are you actually finishing it?`,
+    sleep: `What kept you up? Fun reason or bad reason?`
+  };
 
-    /* Enthusiasm deserves curiosity, not a compliment on their answer. */
-    if (/\b(unreal|amazing|incredible|so good|the best|insane|fire|delicious|obsessed)\b/i.test(userText)) {
-      const t = topicOf(userText);
-      if (t === "food") return fresh([`Where? Name it, I'm going this week.`, `Okay, I need the name and your order.`], thread);
-      if (t === "music") return fresh([`Send it to me. I'll actually listen.`, `Who? I'll have it on by tonight.`], thread);
-      if (t === "movie") return fresh([`Adding it. Was it good-good or just fun?`, `Okay, that's on the list.`], thread);
+  /* When they tell me something, respond to what they said. Answering with my own
+     taste in tacos — the SELF lines above — only makes sense if they asked. */
+  const REACT = {
+    work: [`That's not a week, that's a hostage situation.`, `A client who keeps changing his mind is its own genre of tired.`],
+    hike: [`A trail on a Sunday is the reset button. Jealous.`, `Outside fixes about 60% of things, I'm convinced.`],
+    coffee: [`Correct order of operations for a day, honestly.`, `I respect a person with a coffee routine.`],
+    taco: [`Now I'm hungry and it's entirely your fault.`, `Dangerous topic to bring up with me.`],
+    food: [`Now I'm hungry and it's entirely your fault.`, `That's the kind of detail I actually wanted.`],
+    drink: [`Noted for later, obviously.`, `That's a good order. You pass.`],
+    music: [`Okay, that says more about you than your prompts do.`, `I'd have guessed something worse, no offence.`],
+    dog: [`Immediate yes from me. Dogs first, everything else after.`, `You're going to send a photo eventually, I can feel it.`],
+    movie: [`Adding it to the list I never get through.`, `Good — I need something to watch that isn't the same four films.`],
+    plant: [`Keeping things alive counts as a personality trait, I've decided.`, `Impressive. Mine survive on neglect and luck.`],
+    travel: [`Okay, that's a good answer. Where next?`, `That's the kind of trip I'd actually take.`],
+    run: [`Genuinely impressive, and slightly annoying.`, `That's more discipline than I've got this month.`],
+    book: [`I'm stealing that recommendation.`, `Two started, one finished — that's my average, so respect.`],
+    sleep: [`Rough. Sleep is the one thing I refuse to negotiate on.`, `That's a bad trade and you know it.`]
+  };
+
+  function reactToStatement(p, ctx, text) {
+    /* A fact about them beats a topic reaction — people notice when you catch it. */
+    const f = ctx.facts;
+    const low = String(text).toLowerCase();
+    /* Them naming what they want deserves an answer in kind, not a joke about food. */
+    if (/\bi (just )?want\b|\bi'?m looking for\b|\bi need someone\b|\bmy type is\b/i.test(text)) {
+      return choose(
+        [`${p.intention}, so we're reading from the same page.`, `That's a low bar and somehow still rare. I'm in.`],
+        ctx,
+        "wants"
+      );
     }
-    return fresh(
+    if (f.job && low.includes(f.job)) {
+      return choose(
+        [`${f.job[0].toUpperCase()}${f.job.slice(1)} — that tracks with how you type.`, `Okay, ${f.job}. Organised, or barely holding it together?`],
+        ctx,
+        "job-react"
+      );
+    }
+    if (f.city && low.includes(f.city.toLowerCase())) return `${f.city}. That's close enough to be dangerous.`;
+    if (f.like && low.includes(f.like)) return `${f.like[0].toUpperCase()}${f.like.slice(1)} — okay, tell me how that started.`;
+    if (/\b(unreal|amazing|incredible|so good|the best|insane|fire|delicious|obsessed)\b/i.test(text)) {
+      const t = topicOf(text);
+      if (t === "food" || t === "taco") return `Where? Name it, I'm going this week.`;
+      if (t === "music") return `Send it to me. I'll actually listen.`;
+      if (t === "movie") return `Adding it. Was it good-good or just fun?`;
+    }
+    const t = topicOf(text);
+    return t && REACT[t] ? choose(REACT[t], ctx, `react-${t}`) : "";
+  }
+
+  /* They lobbed my own question back at me, so answer it. */
+  function answerOwn(p, ctx) {
+    const ask = (ctx.botAsk || "").toLowerCase();
+    if (ctx.eitherOr) {
+      const a = ctx.eitherOr[1];
+      const b = ctx.eitherOr[2];
+      return `${a[0].toUpperCase()}${a.slice(1)}, obviously. ${b[0].toUpperCase()}${b.slice(1)} is for people with something to prove.`;
+    }
+    if (/day|going/.test(ask)) {
+      return choose(
+        [`Long, but it's ending better than it started.`, `Busy, then quiet, which is my preferred order.`],
+        ctx,
+        "own-day"
+      );
+    }
+    if (/looking for/.test(ask)) return `${p.intention}. Same question, same honesty.`;
+    if (/tuesday|weeknight|week/.test(ask)) return p.prompts[1] ? p.prompts[1].a : `Quiet, usually. I like a slow evening.`;
+    return (ctx.anyTopic && SELF[ctx.anyTopic]) || disclose(p, ctx);
+  }
+
+  /* They're pushing for an answer I already gave. Don't re-answer from scratch. */
+  function reaffirm(p, ctx) {
+    const kind = ctx.lastAskKind;
+    if (kind === "orientation" || kind === "type") {
+      const label = ORIENT_LABEL[String(p.orientation).toLowerCase()] || p.orientation;
+      return choose([`Yes — ${label}, like I said. You're allowed to relax.`, `I did answer. ${label[0].toUpperCase()}${label.slice(1)}, and interested.`], ctx, "reaff");
+    }
+    if (kind) return `I did answer that. Ask me a harder one.`;
+    return "";
+  }
+
+  /* Asked a factual question, answered it, and don't know their version yet — the
+     natural move is to hand the same question straight back. */
+  function reciprocal(kind, ctx) {
+    if (ctx.answeredKinds.has(kind)) return "";
+    if (kind === "age") return `You? Ballpark is fine.`;
+    if (kind === "job" && !ctx.facts.job) return `What about you — what do you do all day?`;
+    if (kind === "city" && !ctx.facts.city) return `Whereabouts are you?`;
+    if (kind === "intention") return `What are you looking for? Same honesty rules.`;
+    if (kind === "orientation" || kind === "type") return `You?`;
+    if (kind === "howAreYou") return `And you? Real answer, not "good."`;
+    return "";
+  }
+
+  function followUp(p, ctx) {
+    /* Calling back to something from earlier is what makes it feel like one
+       conversation rather than sixteen unrelated turns. */
+    const callback =
+      ctx.stage === "flowing" && ctx.earlier && FOLLOW_UP[ctx.earlier] ? FOLLOW_UP[ctx.earlier] : "";
+    return choose(
       [
-        `Okay, that's a better answer than most.`,
-        `See, that's the kind of thing I wanted to know.`,
-        `I like that you actually answered instead of doing the app thing.`,
-        `Noted. You're more interesting than your prompts, no offence to your prompts.`,
-        `"${quote(userText)}" — okay, you have my attention.`,
-        `Right, and now I have follow-up questions I'm saving for in person.`,
-        `That's a good detail. People usually give me the boring version.`
+        ctx.topic && FOLLOW_UP[ctx.topic],
+        callback,
+        ctx.facts.job && ctx.turns >= 3 && `What's the part of ${ctx.facts.job} nobody outside it understands?`,
+        ctx.facts.like && ctx.turns >= 3 && `How did you get into ${ctx.facts.like}?`,
+        `What does a good Tuesday look like for you?`,
+        `What are you into lately that you'd talk about for an hour?`,
+        `What's the last thing that genuinely annoyed you? Small and petty preferred.`
       ],
-      thread
+      ctx,
+      "follow"
     );
   }
 
+  function offerPlan(p, ctx, said) {
+    const t = topicOf(said) || ctx.anyTopic;
+    if (t === "coffee") return `Coffee then. I know the place. Saturday morning?`;
+    if (t === "hike") return `${p.city === "Austin" ? "Greenbelt" : "Some trail"}, early, before it's an oven. Sunday?`;
+    if (t === "drink") return `One drink somewhere with a patio. Thursday?`;
+    if (t === "food" || t === "taco") return `Dinner then. I'll pick, you veto. Friday?`;
+    return choose(
+      [`I'd rather meet than type. Thursday or Saturday?`, `Drink or a walk this week — which night is bad for you?`],
+      ctx,
+      "offer"
+    );
+  }
+
+  function venue(p, ctx, said) {
+    const spot =
+      {
+        coffee: `There's a coffee place on the east side with a patio`,
+        drink: `Small bar off Rainey, quiet enough to actually talk`,
+        food: `Taco spot on South 1st, no line before 7`,
+        taco: `Taco spot on South 1st, no line before 7`,
+        hike: `Barton Creek trailhead, the shady side`,
+        music: `That bar on Red River with the good back room`
+      }[topicOf(said) || ctx.anyTopic] || `A wine bar near me that isn't trying too hard`;
+    if (ctx.venueSet) return choose([`Same place I said. 7.`, `Same spot, 7 — I'll get there first.`], ctx, "venue-rep");
+    return `${spot}. ${choose([`7ish?`, `Say 7, and text me if you're running late.`], ctx, "venue")}`;
+  }
+
+  function flirtBack(p, ctx) {
+    const heat = ctx.flirtLevel >= 2 || ctx.turns >= 5;
+    return choose(
+      [
+        heat ? `Keep talking like that and I'll clear my Thursday.` : `Smooth. I'm choosing to be charmed.`,
+        heat ? `You're going to make this very easy for me, aren't you.` : `That worked, and I'm annoyed it worked.`,
+        `Okay, confident. I'm into it.`
+      ],
+      ctx,
+      "flirt"
+    );
+  }
+
+  /* I asked "croissant or cookie" and they picked one — say something about the pick. */
+  function pickedSide(ctx, text) {
+    const chosen = [ctx.eitherOr[1], ctx.eitherOr[2]].find((w) => new RegExp(`\\b${w}`, "i").test(text));
+    if (!chosen) return "";
+    const cap = `${chosen[0].toUpperCase()}${chosen.slice(1)}`;
+    return choose(
+      [`${cap}. Correct answer, obviously.`, `${cap} people are trustworthy. That's science.`, `Good. I'd have thought less of you for the other one.`],
+      ctx,
+      "either"
+    );
+  }
+
+  /* ---------- planning the turn ---------- */
+
+  function planMoves(p, ctx, intent, text) {
+    const canAsk = !ctx.askedRecently && !/\?/.test(text || "");
+    const out = [];
+    const push = (line) => {
+      if (line) out.push(line);
+    };
+
+    if (intent === "bye") {
+      push(choose([`Night. This was a good one.`, `Go sleep. I'll be here, being charming later.`], ctx, "bye"));
+      return out;
+    }
+    if (intent === "sexual") {
+      push(choose([`Bold. I'm going to pretend you're funny instead.`, `Slow down — buy me a drink first.`], ctx, "sex"));
+      return out;
+    }
+    if (intent === "greet") {
+      push(choose([`Hey you.`, `Hi — good, you made it.`, `Hey. First decent conversation today.`], ctx, "greet"));
+      if (canAsk) push(choose([`How's your day actually going?`, `What kind of day are you having?`], ctx, "day"));
+      return out;
+    }
+    if (intent === "pending") {
+      push(answerFor(p, ctx.pendingAsk, ctx, text) || disclose(p, ctx));
+      return out;
+    }
+    if (intent === "reaffirm") {
+      push(reaffirm(p, ctx) || answerFor(p, ctx.lastAskKind, ctx, text) || disclose(p, ctx));
+      return out;
+    }
+    if (intent === "asked") {
+      const kind = askedWhat(text);
+      const flirty = RE.flirt.test(text) || RE.tease.test(text);
+      if (flirty && kind) push(flirtBack(p, ctx));
+      push(answerFor(p, kind, ctx, text) || keywordAnswer(p, text) || disclose(p, ctx));
+      if (canAsk && !/\?$/.test(out[out.length - 1] || "")) push(reciprocal(kind, ctx) || (roll(ctx, "bounce", 0.5) ? followUp(p, ctx) : ""));
+      return out;
+    }
+    if (intent === "logistics") {
+      const day = (RE.day.exec(text) || [])[0];
+      if (day) push(`${day[0].toUpperCase()}${day.slice(1).toLowerCase()} it is.`);
+      else if (!/\bwhere\b|\bwhat time\b|\bwhich place\b/i.test(text)) push(`Okay, locked in.`);
+      push(venue(p, ctx, text));
+      return out;
+    }
+    if (intent === "plans") {
+      push(choose([`Yes. I was going to ask, you beat me to it.`, `Finally, someone who just asks.`], ctx, "plans"));
+      push(offerPlan(p, ctx, text));
+      return out;
+    }
+    if (intent === "bounce") {
+      /* "you?" means different things depending on who asked last. */
+      if (ctx.botAskedLast) push(answerOwn(p, ctx));
+      else push(reaffirm(p, ctx) || disclose(p, ctx));
+      return out;
+    }
+    if (intent === "flirt") {
+      const heat = voiceOf(p).flirt ?? 0.5;
+      /* Dialled down, they stay friendly and steer back to conversation. */
+      push(heat < 0.25 ? choose([`Ha. Noted.`, `You're bold, I'll give you that.`], ctx, "cool-flirt") : flirtBack(p, ctx));
+      if (heat > 0.4 && ctx.flirtLevel >= 2 && !ctx.planned && roll(ctx, "plan", heat)) push(offerPlan(p, ctx, text));
+      else if (canAsk && roll(ctx, "ask", 0.4)) push(followUp(p, ctx));
+      return out;
+    }
+    if (intent === "joke") {
+      push(
+        choose(
+          [
+            voiceOf(p).tone === "dry" ? `That's funny. Annoyingly.` : `Okay that got me.`,
+            `I laughed out loud, which is embarrassing in public.`
+          ],
+          ctx,
+          "joke"
+        )
+      );
+      const topical = keywordAnswer(p, text);
+      if (topical) push(topical);
+      else if (canAsk) push(followUp(p, ctx));
+      return out;
+    }
+    if (intent === "compliment") {
+      push(choose([`Careful, I'll believe you.`, `That's a nice thing to say. I'm keeping it.`], ctx, "comp"));
+      if (canAsk && roll(ctx, "comp-ask", 0.5)) push(followUp(p, ctx));
+      return out;
+    }
+    if (intent === "lowEffort") {
+      push(choose([`That's all I get?`, `Okay, one word guy.`, `Hm. Give me something to work with.`], ctx, "low"));
+      if (canAsk) push(followUp(p, ctx));
+      return out;
+    }
+    if (intent === "cool") {
+      push(choose([`Fair enough. No pressure from me.`, `All good — rather you say that than fake it.`], ctx, "cool"));
+      return out;
+    }
+    if (intent === "thanks") {
+      push(choose([`Anytime.`, `Of course.`], ctx, "thanks"));
+      return out;
+    }
+
+    /* answered / statement: engage with the substance of what they said, then either
+       ask something or offer something of my own. Never praise the message itself. */
+    if (intent === "answered" && ctx.eitherOr) push(pickedSide(ctx, text));
+    push(reactToStatement(p, ctx, text));
+    if (!out.length) push(keywordAnswer(p, text));
+    if (!out.length) push(canAsk ? followUp(p, ctx) : disclose(p, ctx));
+    else if (canAsk && !ctx.brief && roll(ctx, "tail", 0.6)) push(followUp(p, ctx));
+    return out;
+  }
+
+  function stylize(text, v, index) {
+    let s = String(text || "").trim();
+    if (!s) return s;
+    const reaction = !index && !/\?$/.test(s);
+    if (v.clip && index && /[.!?]\s+\S/.test(s)) s = s.split(/(?<=[.!?])\s+/)[0];
+    if (v.tone === "dry" || v.tone === "quiet" || v.tone === "thoughtful") s = s.replace(/!+/g, ".");
+    else if (reaction && v.bang && /[.]$/.test(s) && Math.random() < v.bang) s = s.replace(/\.$/, "!");
+    if (v.ellipsis && /[.]$/.test(s) && Math.random() < v.ellipsis) s = s.replace(/\.$/, "…");
+    if (reaction && v.emoji && v.emojiRate && Math.random() < v.emojiRate) s = `${s} ${v.emoji[0]}`;
+    if (v.lower) s = s.toLowerCase();
+    return s;
+  }
+
+  function converse(p, userText, thread, me) {
+    const v = voiceOf(p);
+    const ctx = readThread(p, thread, userText, me);
+    const intent = classify(userText, ctx);
+    let lines = planMoves(p, ctx, intent, userText).filter(Boolean);
+
+    /* Never repeat myself, and match their energy on length. */
+    const seen = new Set();
+    lines = lines.filter((l) => {
+      const k = shape(l);
+      if (seen.has(k) || ctx.said.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    /* Match their energy on length — but never at the cost of an actual answer or a
+       plan, which are the moves that carry the conversation. */
+    const CASUAL = new Set(["statement", "answered", "joke", "compliment", "flirt", "lowEffort", "greet"]);
+    if (ctx.brief && CASUAL.has(intent)) lines = lines.slice(0, 1);
+    lines = lines.slice(0, 2);
+    if (!lines.length) lines = [disclose(p, ctx) || followUp(p, ctx)];
+
+    return { lines: lines.map((l, i) => stylize(l, v, i)), intent, ctx };
+  }
+
   global.latchConverse = converse;
-  global.latchPick = pick;
-})(window);
+  global.latchPick = (a) => a[Math.floor(Math.random() * a.length)];
+  global.latchReadThread = readThread;
+})(typeof window !== "undefined" ? window : globalThis);

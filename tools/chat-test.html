@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Latch — chat transcripts</title>
+  <style>
+    body { font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; background: #14120f; color: #eee6d8; padding: 20px; }
+    h2 { color: #d98a6a; font-size: 13px; margin: 24px 0 8px; }
+    .you { color: #8fb0c9; }
+    .tag { color: #6f665c; }
+    pre { margin: 0; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <pre id="out"></pre>
+  <script src="../profiles.js"></script>
+  <script src="../chat.js"></script>
+  <script>
+    /* Scripted conversations through the real engine, so replies can be read as
+       transcripts instead of clicked through by hand. Add ?who=nina to filter. */
+    const me = { name: "Enzo", age: 28, gender: "men", orientation: "straight", city: "Austin" };
+
+    const SCENARIOS = [
+      {
+        who: "nina",
+        label: "the dialog that went wrong",
+        opener: "Croissant or cookie. This matters.",
+        says: ["Cookie", "Please tell me you're into women", "Are you?", "Good. What do you do for work?", "I'm a software engineer"]
+      },
+      {
+        who: "maya",
+        label: "memory across the thread",
+        says: [
+          "hey",
+          "I'm a nurse, so my week is a mess",
+          "I love hiking though, are you the snack?",
+          "haha ok. what about you, what do you do?",
+          "we should get tacos sometime",
+          "friday works",
+          "where at?"
+        ]
+      },
+      { who: "jordan", label: "short energy, dry voice", says: ["yo", "ok", "cool", "what are you looking for", "you?"] },
+      {
+        who: "hana",
+        label: "questions with no question mark",
+        says: ["are you into men", "how old are you", "you free this weekend", "saturday", "what time"]
+      },
+      {
+        who: "leo",
+        label: "long answers, no questions asked",
+        says: [
+          "Work has been brutal, three deadlines and a client who keeps changing his mind",
+          "I did get out to the greenbelt on sunday which saved me",
+          "Mostly I just want someone to cook dinner with honestly"
+        ]
+      }
+    ];
+
+    const q = new URLSearchParams(location.search);
+    const only = q.get("who");
+    const out = [];
+
+    for (const sc of SCENARIOS) {
+      if (only && sc.who !== only) continue;
+      const p = window.LATCH_PROFILES.find((x) => x.id === sc.who);
+      const thread = [];
+      out.push(`=== ${p.name} (${p.orientation}, ${p.gender}) — ${sc.label} ===`);
+      if (sc.opener) {
+        thread.push({ from: "them", text: sc.opener });
+        out.push(`  ${p.name}: ${sc.opener}`);
+      }
+      for (const text of sc.says) {
+        thread.push({ from: "me", text });
+        out.push(`you: ${text}`);
+        let res;
+        try {
+          res = window.latchConverse(p, text, thread, me);
+        } catch (err) {
+          out.push(`  !! ${err.message}`);
+          break;
+        }
+        const flags = [res.intent, res.ctx.pendingAsk && `pending:${res.ctx.pendingAsk}`, res.ctx.topic && `topic:${res.ctx.topic}`]
+          .filter(Boolean)
+          .join(" ");
+        out.push(`  [${flags}]`);
+        for (const line of res.lines) {
+          out.push(`  ${p.name}: ${line}`);
+          thread.push({ from: "them", text: line });
+        }
+      }
+      out.push("");
+    }
+
+    document.getElementById("out").textContent = out.join("\n");
+  </script>
+</body>
+</html>

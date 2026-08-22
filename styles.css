@@ -211,8 +211,8 @@ img { max-width: 100%; display: block; }
 }
 
 /* Messages */
-.msg-layout { display: grid; gap: 0; min-height: 60dvh; }
-.thread-list { display: grid; gap: 8px; }
+.msg-layout { display: grid; gap: 0; align-content: start; }
+.thread-list { display: grid; gap: 8px; align-content: start; }
 .thread-row {
   display: grid;
   grid-template-columns: 56px 1fr auto;
@@ -231,6 +231,9 @@ img { max-width: 100%; display: block; }
   object-fit: cover;
 }
 .thread-row h3 { margin: 0; font-size: 1rem; }
+/* Without this the nowrap preview sets the track's min-content width and the whole
+   row grows past the phone frame. */
+.thread-row > div { min-width: 0; }
 .thread-row p {
   margin: 2px 0 0;
   color: var(--muted);
@@ -253,6 +256,9 @@ img { max-width: 100%; display: block; }
   padding-bottom: 12px;
 }
 .chat-head img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.chat-who { min-width: 0; flex: 1; }
+.chat-who strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-btn { font-size: 1.1rem; padding: 6px 10px; }
 .bubbles {
   flex: 1;
   display: flex;
@@ -266,6 +272,7 @@ img { max-width: 100%; display: block; }
   border-radius: 18px;
   line-height: 1.4;
   font-size: 0.95rem;
+  overflow-wrap: anywhere;
 }
 .bubble.them { background: #fff; align-self: flex-start; border-bottom-left-radius: 6px; }
 .bubble.me { background: var(--ink); color: #fff; align-self: flex-end; border-bottom-right-radius: 6px; }
@@ -369,6 +376,90 @@ label.stack { display: grid; gap: 6px; font-size: 0.85rem; color: var(--muted); 
   padding: 20px;
   box-shadow: var(--shadow);
 }
+.sheet-full {
+  display: flex;
+  flex-direction: column;
+  width: min(430px, 100%);
+  max-height: min(88dvh, 900px);
+  padding: 0;
+  overflow: hidden;
+}
+.sheet-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.sheet-bar strong { font-family: var(--serif); font-size: 1.05rem; }
+.sheet-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 14px;
+}
+.sheet-scroll .profile-scroll { gap: 12px; }
+.sheet-foot {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+  padding: 10px 14px calc(10px + var(--safe-b));
+  border-top: 1px solid var(--line);
+}
+.like-note {
+  background: var(--card-2, #f3ece1);
+  border-radius: 16px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.like-note span { font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.like-note p { margin: 4px 0 0; font-family: var(--serif); font-size: 1.05rem; }
+
+.sheet-foot.one { grid-template-columns: 1fr; }
+.sheet-foot.three { grid-template-columns: 1fr 1fr 1.2fr; }
+
+.menu-list { display: grid; gap: 6px; margin: 4px 0 4px; }
+.menu-item {
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 0.95rem;
+  font-weight: 600;
+  width: 100%;
+}
+.menu-item.danger, .btn-ghost.danger { color: #b3402c; }
+
+.admin-form { display: grid; gap: 12px; align-content: start; }
+.admin-form h4 {
+  margin: 8px 0 0;
+  font-family: var(--serif);
+  font-size: 1rem;
+}
+.admin-form label { display: grid; gap: 6px; font-size: 0.8rem; color: var(--muted); }
+.admin-form .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.admin-form .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.admin-form input[type="range"] { padding: 0; accent-color: var(--accent); }
+.admin-form input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+
+.admin-card {
+  display: grid;
+  gap: 8px;
+  background: var(--card);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.admin-card h3 { font-family: var(--serif); margin: 0; }
+.admin-card p { margin: 0; font-size: 0.85rem; }
+
 .sheet h3 { font-family: var(--serif); margin: 0 0 8px; }
 .sheet textarea { min-height: 90px; resize: vertical; }
 .sheet .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }

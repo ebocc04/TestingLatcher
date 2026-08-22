@@ -78,6 +78,8 @@ function emptyState() {
     threads: {},
     unread: {},
     pendingBots: {},
+    tweaks: {},
+    unmatched: [],
     github: defaultGithub(),
     updatedAt: 0
   };
@@ -91,6 +93,8 @@ function migrate(raw) {
   s.github = { ...defaultGithub(), ...(raw.github || {}) };
   if (!s.github.owner || !s.github.repo) s.github = { ...latchStorage.inferTarget(), sha: s.github.sha || null };
   s.pendingBots = {};
+  s.tweaks = raw.tweaks || {};
+  s.unmatched = raw.unmatched || [];
   if (!s.user.photos.some(Boolean) || !s.user.name) s.onboarded = false;
   return s;
 }
@@ -178,13 +182,35 @@ function setGhStatus(text) {
   if (el) el.textContent = text;
 }
 
+/* Per-person overrides from the admin sheet, applied on read so every card, chat and
+   filter sees the edited version rather than the profiles.js original. */
+const TWEAK_FIELDS = ["name", "age", "city", "job", "school", "height", "intention", "gender", "orientation"];
+
+function applyTweaks(p) {
+  const t = state.tweaks && state.tweaks[p.id];
+  if (!t) return p;
+  const out = { ...p, voice: { ...p.voice } };
+  TWEAK_FIELDS.forEach((k) => {
+    if (t[k] !== undefined && t[k] !== "") out[k] = k === "age" ? Number(t[k]) : t[k];
+  });
+  if (t.prompts) out.prompts = p.prompts.map((q, i) => (t.prompts[i] ? { ...q, a: t.prompts[i] } : q));
+  /* chat.js reads style off the profile, so tone edits reach the reply planner. */
+  if (t.style) out.style = t.style;
+  return out;
+}
+
+function allProfiles() {
+  return window.LATCH_PROFILES.map(applyTweaks);
+}
+
 function profileById(id) {
-  return window.LATCH_PROFILES.find((p) => p.id === id);
+  const p = window.LATCH_PROFILES.find((x) => x.id === id);
+  return p ? applyTweaks(p) : null;
 }
 
 function visibleProfiles() {
   const me = state.user;
-  return window.LATCH_PROFILES.filter((p) => {
+  return allProfiles().filter((p) => {
     if (me.seeking !== "everyone" && p.gender !== me.seeking) return false;
     if (!openTo(me, p.gender)) return false;
     if (!openTo(p, me.gender)) return false;
@@ -193,17 +219,17 @@ function visibleProfiles() {
 }
 
 function discoverQueue() {
-  const gone = new Set([...state.skipped, ...state.liked, ...state.matches]);
+  const gone = new Set([...state.skipped, ...state.liked, ...state.matches, ...state.unmatched]);
   return visibleProfiles().filter((p) => !gone.has(p.id) && !p.standout);
 }
 
 function standouts() {
-  const gone = new Set([...state.skipped, ...state.liked, ...state.matches]);
+  const gone = new Set([...state.skipped, ...state.liked, ...state.matches, ...state.unmatched]);
   return visibleProfiles().filter((p) => p.standout && !gone.has(p.id));
 }
 
 function likesIncoming() {
-  const gone = new Set([...state.skipped, ...state.matches]);
+  const gone = new Set([...state.skipped, ...state.matches, ...state.unmatched]);
   return visibleProfiles().filter((p) => p.likesYou && !gone.has(p.id) && !state.liked.includes(p.id));
 }
 
@@ -303,16 +329,10 @@ function bindPhotoInputs(root, after) {
   });
 }
 
-function renderDiscover() {
-  const root = $("view-discover");
-  const queue = discoverQueue();
-  if (!queue.length) {
-    root.innerHTML = `<div class="empty"><h3>You're caught up</h3><p class="muted">Nobody left in this filter. Change sexuality / Show me in Profile, or reset the deck.</p></div>`;
-    return;
-  }
-  const p = queue[0];
-  root.innerHTML = `
-    <article class="profile-scroll" data-id="${p.id}">
+/* The whole profile: every photo, every prompt, the facts table. Shared by Discover
+   and by the full-screen view opened from Standouts and Likes. */
+function profileArticleHtml(p) {
+  return `<article class="profile-scroll" data-id="${p.id}">
       ${p.photos
         .map(
           (src, i) => `
@@ -344,7 +364,19 @@ function renderDiscover() {
         <div class="fact"><span>School</span><b>${esc(p.school)}</b></div>
         <div class="fact"><span>Looking for</span><b>${esc(p.intention)}</b></div>
       </div>
-    </article>
+    </article>`;
+}
+
+function renderDiscover() {
+  const root = $("view-discover");
+  const queue = discoverQueue();
+  if (!queue.length) {
+    root.innerHTML = `<div class="empty"><h3>You're caught up</h3><p class="muted">Nobody left in this filter. Change sexuality / Show me in Profile, or reset the deck.</p></div>`;
+    return;
+  }
+  const p = queue[0];
+  root.innerHTML = `
+    ${profileArticleHtml(p)}
     <div class="actions">
       <button type="button" class="skip" title="Skip">✕</button>
       <button type="button" class="like" title="Like">♡</button>
@@ -400,19 +432,28 @@ function renderLikes() {
   }
   root.innerHTML = `<div class="cards-grid">${list
     .map(
-      (p) => `<article class="mini-card">
+      (p) => `<button class="mini-card" data-open="${p.id}">
         <img src="${esc(photoUrl(p, 0))}" alt="" />
         <div class="pad">
           <h3>${esc(p.name)}, ${p.age}</h3>
           <p>${esc(orientationLabel(p.orientation))} · ${esc(genderLabel(p.gender))}</p>
           ${p.likeNote ? `<p class="note">“${esc(p.likeNote)}”</p>` : `<p>${esc(p.job)}</p>`}
-          <button class="match-btn" data-match="${p.id}">Match</button>
+          <span class="match-btn" data-match="${p.id}">Match</span>
         </div>
-      </article>`
+      </button>`
     )
     .join("")}</div>`;
+  root.querySelectorAll("[data-open]").forEach((el) => {
+    el.onclick = (e) => {
+      if (e.target.closest("[data-match]")) return;
+      openPreview(profileById(el.dataset.open), { match: true });
+    };
+  });
   root.querySelectorAll("[data-match]").forEach((btn) => {
-    btn.onclick = () => matchNow(btn.dataset.match, "You matched!");
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      matchNow(btn.dataset.match, "You matched!");
+    };
   });
 }
 
@@ -469,10 +510,11 @@ function renderChat(root) {
       <div class="chat-head">
         <button class="btn-ghost" id="back-msg">←</button>
         <img src="${esc(photoUrl(p, 0))}" alt="" />
-        <div>
+        <div class="chat-who">
           <strong>${esc(p.name)}, ${p.age}</strong>
           <div class="muted" style="font-size:.8rem">${esc(orientationLabel(p.orientation))} · ${esc(p.job)}</div>
         </div>
+        <button class="btn-ghost menu-btn" id="chat-menu" aria-label="Chat options">☰</button>
       </div>
       <div class="bubbles" id="bubbles">
         ${msgs
@@ -486,6 +528,7 @@ function renderChat(root) {
       </form>
     </div>`;
   $("back-msg").onclick = () => setView("messages");
+  $("chat-menu").onclick = () => openChatMenu(p);
   const form = $("composer");
   form.onsubmit = (e) => {
     e.preventDefault();
@@ -611,7 +654,16 @@ function renderProfile() {
         )
         .join("")}
       ${githubFieldsHtml()}
-      <button class="btn-ghost" id="reset-demo">Reset likes, matches & chats</button>
+      <div class="admin-card">
+        <h3>Admin</h3>
+        <p class="muted">Manual controls. These act on this browser, then sync like everything else.</p>
+        <button class="btn-ghost" id="reset-demo">Reset likes, matches &amp; chats</button>
+        <button class="btn-ghost" id="reset-people">Reset customized people${
+          Object.keys(state.tweaks || {}).length ? ` (${Object.keys(state.tweaks).length})` : ""
+        }</button>
+        <button class="btn-ghost" id="reset-keep">Start over, keep my profile</button>
+        <button class="btn-ghost danger" id="reset-all">Full reset — erase everything</button>
+      </div>
     </div>`;
   root.querySelectorAll("[data-f]").forEach((el) => {
     el.oninput = () => {
@@ -652,6 +704,52 @@ function renderProfile() {
     toast("Deck shuffled");
     setView("discover");
   };
+  $("reset-people").onclick = () => {
+    state.tweaks = {};
+    save();
+    toast("Everyone back to their original personality");
+    render();
+  };
+  $("reset-keep").onclick = () => confirmReset("keep");
+  $("reset-all").onclick = () => confirmReset("all");
+}
+
+/* Two resets, per the admin brief: one wipes the app but hands your profile back to
+   the setup wizard prefilled, the other erases you too. */
+function confirmReset(mode) {
+  const keep = mode === "keep";
+  const modal = $("modal");
+  modal.classList.remove("hidden");
+  modal.innerHTML = `<div class="sheet">
+    <h3>${keep ? "Start over, keep my profile" : "Full reset"}</h3>
+    <p class="muted">${
+      keep
+        ? "Clears likes, matches, chats, roses and any customized people, then reopens setup with your details already filled in."
+        : "Erases everything including your profile and photos, on this browser and in the saved board. There's no undo."
+    }</p>
+    <div class="row">
+      <button class="btn-ghost" id="cancel-m">Cancel</button>
+      <button class="btn-primary" id="do-reset">${keep ? "Reset & edit profile" : "Erase everything"}</button>
+    </div>
+  </div>`;
+  $("cancel-m").onclick = closeModal;
+  modal.onclick = (e) => {
+    if (e.target === modal) closeModal();
+  };
+  $("do-reset").onclick = () => {
+    const user = keep ? JSON.parse(JSON.stringify(state.user)) : null;
+    const github = { ...state.github };
+    state = migrate({ ...emptyState(), github });
+    if (keep) {
+      state.user = user;
+      state.onboarded = false;
+    }
+    onboardStep = 0;
+    closeModal();
+    save();
+    toast(keep ? "Reset — your profile is prefilled" : "Everything erased");
+    render();
+  };
 }
 
 function openComment(p, promptIndex) {
@@ -680,26 +778,206 @@ function openComment(p, promptIndex) {
 }
 
 function openPreview(p, opts = {}) {
+  if (!p) return;
+  const action = opts.rose ? "Send a rose" : opts.match ? "Match" : "Like";
   const modal = $("modal");
   modal.classList.remove("hidden");
-  modal.innerHTML = `<div class="sheet">
-    <img src="${esc(photoUrl(p, 0))}" alt="" style="width:100%;border-radius:16px;aspect-ratio:4/5;object-fit:cover" />
-    <h3 style="margin-top:12px">${esc(p.name)}, ${p.age}</h3>
-    <p class="muted">${esc(orientationLabel(p.orientation))} · ${esc(genderLabel(p.gender))} · ${esc(p.job)}</p>
-    <p class="a" style="font-family:var(--serif);font-size:1.15rem">${esc(p.prompts[0].a)}</p>
-    <div class="row">
-      <button class="btn-ghost" id="cancel-m">Close</button>
-      <button class="btn-primary" id="do">${opts.rose ? "Send rose" : "Like"}</button>
+  modal.innerHTML = `<div class="sheet sheet-full">
+    <div class="sheet-bar">
+      <button class="btn-ghost" id="cancel-m" aria-label="Close">←</button>
+      <strong>${esc(p.name)}, ${p.age}</strong>
     </div>
+    <div class="sheet-scroll">
+      ${p.likeNote ? `<div class="like-note"><span class="muted">Liked you</span><p>“${esc(p.likeNote)}”</p></div>` : ""}
+      ${profileArticleHtml(p)}
+    </div>
+    ${
+      opts.view
+        ? `<div class="sheet-foot one"><button class="btn-ghost" id="pass">Close</button></div>`
+        : `<div class="sheet-foot">
+      <button class="btn-ghost" id="pass">Pass</button>
+      <button class="btn-primary" id="do">${action}</button>
+    </div>`
+    }
   </div>`;
   $("cancel-m").onclick = closeModal;
   modal.onclick = (e) => {
     if (e.target === modal) closeModal();
   };
+  modal.querySelectorAll("[data-comment]").forEach((btn) => {
+    btn.onclick = () => openComment(p, Number(btn.dataset.comment));
+  });
+  $("pass").onclick = () => {
+    closeModal();
+    if (!opts.view) skip(p.id);
+  };
+  if (opts.view) return;
   $("do").onclick = () => {
     closeModal();
     if (opts.rose) sendRose(p.id);
+    else if (opts.match) matchNow(p.id, "You matched!");
     else likePerson(p.id, null);
+  };
+}
+
+function openChatMenu(p) {
+  const modal = $("modal");
+  modal.classList.remove("hidden");
+  modal.innerHTML = `<div class="sheet">
+    <h3>${esc(p.name)}</h3>
+    <div class="menu-list">
+      <button class="menu-item" id="m-profile">View full profile</button>
+      <button class="menu-item" id="m-admin">Admin — customize this person</button>
+      <button class="menu-item" id="m-clear">Clear this conversation</button>
+      <button class="menu-item danger" id="m-unmatch">Unmatch</button>
+    </div>
+    <div class="row"><button class="btn-ghost" id="cancel-m">Close</button></div>
+  </div>`;
+  $("cancel-m").onclick = closeModal;
+  modal.onclick = (e) => {
+    if (e.target === modal) closeModal();
+  };
+  $("m-profile").onclick = () => {
+    closeModal();
+    openPreview(p, { view: true });
+  };
+  $("m-admin").onclick = () => openPersonAdmin(p);
+  $("m-clear").onclick = () => {
+    delete state.threads[p.id];
+    delete state.pendingBots[p.id];
+    save();
+    closeModal();
+    toast("Conversation cleared");
+    render();
+  };
+  $("m-unmatch").onclick = () => {
+    closeModal();
+    unmatch(p);
+  };
+}
+
+function unmatch(p) {
+  state.matches = state.matches.filter((x) => x !== p.id);
+  delete state.threads[p.id];
+  delete state.unread[p.id];
+  delete state.pendingBots[p.id];
+  if (!state.unmatched.includes(p.id)) state.unmatched.push(p.id);
+  save();
+  toast(`Unmatched ${p.name}`);
+  setView("messages");
+}
+
+const TONES = ["playful", "dry", "warm", "thoughtful", "direct", "witty", "soft", "quiet", "grounded", "easy"];
+
+/* Everything here writes into state.tweaks[id], which applyTweaks() layers over the
+   original profile — so edits show up in Discover, Likes and the reply planner alike. */
+function openPersonAdmin(p) {
+  const t = { ...(state.tweaks[p.id] || {}) };
+  const style = { ...(t.style || {}) };
+  const modal = $("modal");
+  modal.classList.remove("hidden");
+  modal.innerHTML = `<div class="sheet sheet-full">
+    <div class="sheet-bar">
+      <button class="btn-ghost" id="cancel-m" aria-label="Close">←</button>
+      <strong>Admin · ${esc(p.name)}</strong>
+    </div>
+    <div class="sheet-scroll admin-form">
+      <p class="muted">Overrides for this person only. Blank means "use the original."</p>
+      <label>Name<input id="a-name" value="${esc(t.name ?? "")}" placeholder="${esc(p.name)}" /></label>
+      <div class="two">
+        <label>Age<input id="a-age" type="number" min="18" max="99" value="${esc(t.age ?? "")}" placeholder="${p.age}" /></label>
+        <label>City<input id="a-city" value="${esc(t.city ?? "")}" placeholder="${esc(p.city)}" /></label>
+      </div>
+      <label>Job<input id="a-job" value="${esc(t.job ?? "")}" placeholder="${esc(p.job)}" /></label>
+      <div class="two">
+        <label>Gender<select id="a-gender">${["", "women", "men", "nonbinary"]
+          .map((g) => `<option value="${g}" ${t.gender === g ? "selected" : ""}>${g ? genderLabel(g) : "Original"}</option>`)
+          .join("")}</select></label>
+        <label>Sexuality<select id="a-orientation">${["", ...ORIENTATIONS.map(([v]) => v)]
+          .map((o) => `<option value="${o}" ${t.orientation === o ? "selected" : ""}>${o ? orientationLabel(o) : "Original"}</option>`)
+          .join("")}</select></label>
+      </div>
+      <label>Looking for<input id="a-intention" value="${esc(t.intention ?? "")}" placeholder="${esc(p.intention)}" /></label>
+
+      <h4>Personality</h4>
+      <label>Chat tone<select id="a-tone">${["", ...TONES]
+        .map((x) => `<option value="${x}" ${style.tone === x ? "selected" : ""}>${x ? x[0].toUpperCase() + x.slice(1) : "Original"}</option>`)
+        .join("")}</select></label>
+      <label>Flirtiness <span class="muted">${Math.round((style.flirt ?? 0.5) * 100)}%</span>
+        <input id="a-flirt" type="range" min="0" max="100" value="${Math.round((style.flirt ?? 0.5) * 100)}" /></label>
+      <label>Emoji <span class="muted">${Math.round((style.emojiRate ?? 0.15) * 100)}%</span>
+        <input id="a-emoji" type="range" min="0" max="100" value="${Math.round((style.emojiRate ?? 0.15) * 100)}" /></label>
+      <label>Exclamation marks <span class="muted">${Math.round((style.bang ?? 0.25) * 100)}%</span>
+        <input id="a-bang" type="range" min="0" max="100" value="${Math.round((style.bang ?? 0.25) * 100)}" /></label>
+      <label class="check"><input id="a-lower" type="checkbox" ${style.lower ? "checked" : ""} /> types in lowercase</label>
+      <label class="check"><input id="a-clip" type="checkbox" ${style.clip ? "checked" : ""} /> keeps replies short</label>
+      <label>Reply speed<select id="a-pace">${[
+        ["", "Original"],
+        ["fast", "Fast — replies immediately"],
+        ["normal", "Normal"],
+        ["slow", "Slow — makes you wait"]
+      ]
+        .map(([v, l]) => `<option value="${v}" ${style.pace === v ? "selected" : ""}>${l}</option>`)
+        .join("")}</select></label>
+
+      <h4>Prompts</h4>
+      ${p.prompts
+        .map(
+          (q, i) => `<label>${esc(q.q)}<textarea id="a-prompt-${i}" rows="2" placeholder="${esc(q.a)}">${esc(
+            (t.prompts && t.prompts[i]) || ""
+          )}</textarea></label>`
+        )
+        .join("")}
+    </div>
+    <div class="sheet-foot three">
+      <button class="btn-ghost" id="a-reset">Reset</button>
+      <button class="btn-ghost" id="a-cancel">Cancel</button>
+      <button class="btn-primary" id="a-save">Save</button>
+    </div>
+  </div>`;
+  const close = () => closeModal();
+  $("cancel-m").onclick = close;
+  $("a-cancel").onclick = close;
+  modal.querySelectorAll('input[type="range"]').forEach((r) => {
+    r.oninput = () => {
+      const out = r.parentElement.querySelector(".muted");
+      if (out) out.textContent = `${r.value}%`;
+    };
+  });
+  $("a-reset").onclick = () => {
+    delete state.tweaks[p.id];
+    save();
+    closeModal();
+    toast(`${p.name} reset to original`);
+    render();
+  };
+  $("a-save").onclick = () => {
+    const val = (id) => $(id).value.trim();
+    const next = {
+      name: val("a-name"),
+      age: val("a-age"),
+      city: val("a-city"),
+      job: val("a-job"),
+      gender: val("a-gender"),
+      orientation: val("a-orientation"),
+      intention: val("a-intention"),
+      prompts: p.prompts.map((_, i) => val(`a-prompt-${i}`)),
+      style: {
+        tone: val("a-tone"),
+        flirt: Number($("a-flirt").value) / 100,
+        emojiRate: Number($("a-emoji").value) / 100,
+        bang: Number($("a-bang").value) / 100,
+        lower: $("a-lower").checked,
+        clip: $("a-clip").checked,
+        pace: val("a-pace")
+      }
+    };
+    if (!next.prompts.some(Boolean)) delete next.prompts;
+    state.tweaks[p.id] = next;
+    save();
+    closeModal();
+    toast(`${next.name || p.name} updated`);
+    render();
   };
 }
 
@@ -766,15 +1044,16 @@ function sendUserMessage(id, text) {
 function queueBotReply(id, userText) {
   const p = profileById(id);
   const thread = state.threads[id] || [];
-  const { lines } = latchConverse(p, userText, thread);
+  const { lines } = latchConverse(p, userText, thread, state.user);
   const queue = (lines || []).filter(Boolean).slice(0, 3);
   if (!queue.length) return;
+  const pace = { fast: 0.35, normal: 1, slow: 2.2 }[(p.style && p.style.pace) || "normal"] || 1;
   const sendNext = (i) => {
     state.pendingBots[id] = true;
     save({ skipRemote: true });
     render();
     const typing = Math.min(4200, queue[i].length * 28);
-    const delay = (i === 0 ? 800 : 400) + typing + Math.random() * 700;
+    const delay = ((i === 0 ? 800 : 400) + typing + Math.random() * 700) * pace;
     setTimeout(() => {
       if (!state.threads[id]) state.threads[id] = [];
       state.threads[id].push({ from: "them", text: queue[i], ts: Date.now() });
@@ -993,4 +1272,8 @@ if (state.onboarded) {
 }
 window.addEventListener("resize", () => {
   if (state.view === "messages" || state.view === "chat") render();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("modal").classList.contains("hidden")) closeModal();
 });
