@@ -1171,7 +1171,7 @@ function openAddProfile() {
         <strong>Add a profile</strong>
       </div>
       <div class="sheet-scroll admin-form">
-        <p class="muted">Grab opens a debug Chrome window and reads the photos from the live page, so Instagram's login wall doesn't 403 the fetch. Run <b>tools/ig-grab.ps1</b> once on this computer, log into Instagram in that Chrome, then hit Grab. Otherwise upload shots.</p>
+        <p class="muted">Grab reads the profile grid in debug Chrome — posts of people only, not your avatar or random page images. Keep <b>tools/ig-grab.ps1</b> running and stay logged into Instagram in that window.</p>
         <label>Instagram
           <input id="add-ig" value="${esc(draft.instagram)}" placeholder="https://instagram.com/name or a post link" />
         </label>

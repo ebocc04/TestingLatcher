@@ -82,18 +82,62 @@ function Grab-Profile([string]$pageUrl) {
   $js = @'
 (async () => {
   if (/accounts\/login/i.test(location.href)) return { login: true, photos: [] };
-  const urls = [];
-  const add = (u) => {
-    if (!u || urls.includes(u)) return;
-    if (/scontent|cdninstagram|fbcdn/i.test(u)) urls.push(u);
-  };
-  document.querySelectorAll("img").forEach((img) => {
-    add(img.currentSrc || img.src);
-    String(img.srcset || "").split(",").forEach((p) => add(p.trim().split(" ")[0]));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < 5; i++) {
+    window.scrollBy(0, 1000);
+    await sleep(350);
+  }
+  window.scrollTo(0, 0);
+  await sleep(250);
+
+  const seen = new Set();
+  const candidates = [];
+  document.querySelectorAll('main a[href*="/p/"] img, main a[href*="/reel/"] img').forEach((img) => {
+    if (img.closest("nav, header, aside, [role='navigation']")) return;
+    const src = img.currentSrc || img.src;
+    if (!src || seen.has(src)) return;
+    if (!/scontent|cdninstagram|fbcdn/i.test(src)) return;
+    const w = img.naturalWidth || img.width || 0;
+    if (w && w < 140) return;
+    seen.add(src);
+    candidates.push(img);
   });
-  const out = [];
-  for (const src of urls.slice(0, 6)) {
+
+  const isPerson = async (img) => {
     try {
+      if (window.FaceDetector) {
+        const faces = await new FaceDetector({ fastMode: true, maxDetectedFaces: 5 }).detect(img);
+        if (faces && faces.length) return true;
+      }
+    } catch (e) {}
+    try {
+      const c = document.createElement("canvas");
+      const s = 80;
+      c.width = s;
+      c.height = s;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0, s, s);
+      const data = ctx.getImageData(0, 0, s, s).data;
+      let skin = 0;
+      const n = s * s;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        if (r > 60 && g > 30 && b > 15 && r >= g && r > b && max - min > 15 && r - g > 8) skin += 1;
+      }
+      const p = skin / n;
+      return p > 0.07 && p < 0.7;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const out = [];
+  for (const img of candidates) {
+    if (out.length >= 6) break;
+    if (!(await isPerson(img))) continue;
+    try {
+      const src = img.currentSrc || img.src;
       const blob = await fetch(src).then((r) => r.blob());
       const data = await new Promise((resolve) => {
         const fr = new FileReader();
@@ -103,7 +147,7 @@ function Grab-Profile([string]$pageUrl) {
       out.push(data);
     } catch (e) {}
   }
-  return { login: false, photos: out, href: location.href };
+  return { login: false, photos: out, href: location.href, scanned: candidates.length };
 })()
 '@
   $res = Send-Cdp $ws "Runtime.evaluate" @{
