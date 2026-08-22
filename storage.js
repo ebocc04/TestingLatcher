@@ -271,23 +271,36 @@
     return ref;
   }
 
-  function resolvePhoto(src) {
+  function publicPhotoUrl(src, github) {
+    if (!src || isDataUrl(src) || isIdb(src)) return "";
+    if (/^https?:\/\//i.test(src)) return src;
+    const g = github || inferTarget();
+    const rel = String(src).replace(/^\.\//, "").replace(/^\/+/, "");
+    if (!rel || !g.owner || !g.repo) return rel;
+    return `https://raw.githubusercontent.com/${g.owner}/${g.repo}/${g.branch || "main"}/${rel}`;
+  }
+
+  function resolvePhoto(src, github) {
     if (!src) return "";
     if (photoCache.has(src)) return photoCache.get(src);
-    if (isIdb(src)) return photoCache.get(src) || "";
-    return src;
+    if (isDataUrl(src)) return src;
+    if (isIdb(src)) {
+      const key = src.slice(4);
+      return photoCache.get(src) || publicPhotoUrl(`data/photos/${key}.jpg`, github);
+    }
+    return publicPhotoUrl(src, github) || src;
   }
 
   function walkPhotos(state, visit) {
     const jobs = [];
-    const each = (arr) => {
+    const each = (arr, prefix) => {
       if (!arr) return;
       arr.forEach((src, i) => {
-        if (src) jobs.push(Promise.resolve(visit(arr, i, src)));
+        if (src) jobs.push(Promise.resolve(visit(arr, i, src, prefix)));
       });
     };
-    each(state.user && state.user.photos);
-    (state.customProfiles || []).forEach((p) => each(p.photos));
+    each(state.user && state.user.photos, "user");
+    (state.customProfiles || []).forEach((p) => each(p.photos, p.id));
     return Promise.all(jobs);
   }
 
@@ -302,8 +315,8 @@
   }
 
   async function parkInlinePhotos(state) {
-    await walkPhotos(state, async (arr, i, src) => {
-      if (isDataUrl(src)) arr[i] = await keepPhoto(src, `park-${Date.now().toString(36)}-${i}`);
+    await walkPhotos(state, async (arr, i, src, prefix) => {
+      if (isDataUrl(src)) arr[i] = await keepPhoto(src, `${prefix}-${i}`);
     });
   }
 
@@ -343,21 +356,51 @@
     return relPath;
   }
 
-  async function dataForUpload(src) {
-    if (isDataUrl(src)) return src;
-    if (isIdb(src)) return photoCache.get(src) || (await photoOp("readonly", (store) => store.get(src.slice(4))));
+  async function asDataUrl(data) {
+    if (!data) return "";
+    if (typeof data === "string") return data;
+    if (typeof Blob !== "undefined" && data instanceof Blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(data);
+      });
+    }
     return "";
   }
 
+  async function dataForUpload(src) {
+    if (isDataUrl(src)) return src;
+    if (isIdb(src)) return asDataUrl(photoCache.get(src) || (await photoOp("readonly", (store) => store.get(src.slice(4)))));
+    return "";
+  }
+
+  function isLocalPhoto(src) {
+    return Boolean(src && (isDataUrl(src) || isIdb(src)));
+  }
+
+  function countFilePhotos(state) {
+    let n = 0;
+    walkPhotos(state, (_arr, _i, src) => {
+      if (src && !isLocalPhoto(src)) n += 1;
+    });
+    return n;
+  }
+
   async function offloadPhotos(state, github) {
-    if (!getToken() || !github?.owner || !github?.repo) return;
+    if (!getToken() || !github?.owner || !github?.repo) {
+      throw new Error("Connect GitHub so photos can follow you to other devices.");
+    }
     const flush = async (arr, prefix) => {
       if (!arr) return;
       for (let i = 0; i < arr.length; i += 1) {
         const src = arr[i];
-        if (!src || (!isDataUrl(src) && !isIdb(src))) continue;
+        if (!isLocalPhoto(src)) continue;
         const data = await dataForUpload(src);
-        if (!isDataUrl(data)) continue;
+        if (!isDataUrl(data)) {
+          throw new Error("A photo is only on this phone/computer. Add it again, then Save.");
+        }
         const id = String(prefix).replace(/[^a-z0-9._-]+/gi, "-") || "pic";
         arr[i] = await putPhotoFile(github, `data/photos/${id}-${i}.jpg`, data);
       }
@@ -434,6 +477,8 @@
     resolvePhoto,
     hydratePhotos,
     parkInlinePhotos,
-    offloadPhotos
+    offloadPhotos,
+    countFilePhotos,
+    isLocalPhoto
   };
 })(window);

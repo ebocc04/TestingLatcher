@@ -150,11 +150,14 @@ function toast(msg) {
 
 async function syncToGithub() {
   const g = state.github;
-  if (!latchStorage.getToken() || !g.owner || !g.repo || ghBusy) return;
+  if (!latchStorage.getToken() || !g.owner || !g.repo) return;
+  if (ghBusy) {
+    syncToGithub.again = true;
+    return;
+  }
   ghBusy = true;
-  setGhStatus("Saving to GitHub…");
+  setGhStatus("Saving photos…");
   try {
-    setGhStatus("Saving photos…");
     await latchStorage.offloadPhotos(state, g);
     const sha = await latchStorage.pushBoard(g, boardPayload(), g.sha);
     if (sha) state.github.sha = sha;
@@ -164,6 +167,10 @@ async function syncToGithub() {
     setGhStatus(err.message);
   } finally {
     ghBusy = false;
+    if (syncToGithub.again) {
+      syncToGithub.again = false;
+      syncToGithub().catch(() => {});
+    }
   }
 }
 
@@ -178,7 +185,10 @@ async function loadFromGithub() {
       return;
     }
     state.github.sha = remote.sha;
-    if (remote.data && (remote.data.updatedAt || 0) >= (state.updatedAt || 0)) {
+    const remoteNewer = remote.data && (remote.data.updatedAt || 0) >= (state.updatedAt || 0);
+    const remoteHasFiles =
+      remote.data && latchStorage.countFilePhotos(remote.data) > latchStorage.countFilePhotos(state);
+    if (remote.data && (remoteNewer || remoteHasFiles)) {
       const keepGh = { ...state.github, sha: remote.sha };
       state = migrate(remote.data);
       state.github = { ...keepGh, photoShas: { ...(remote.data.github && remote.data.github.photoShas), ...keepGh.photoShas } };
@@ -332,7 +342,7 @@ function titles() {
 }
 
 function photoUrl(p, i) {
-  return latchStorage.resolvePhoto(p.photos[i] || p.photos[0]);
+  return latchStorage.resolvePhoto(p.photos[i] || p.photos[0], state.github);
 }
 
 function userPhotos() {
@@ -355,7 +365,7 @@ function photoGridHtml(prefix) {
   return `<div class="photo-row six">${[0, 1, 2, 3, 4, 5]
     .map(
       (i) => `<div class="photo-slot">
-        ${state.user.photos[i] ? `<img src="${esc(latchStorage.resolvePhoto(state.user.photos[i]))}" alt="" />` : ""}
+        ${state.user.photos[i] ? `<img src="${esc(latchStorage.resolvePhoto(state.user.photos[i], state.github))}" alt="" />` : ""}
         <label>${state.user.photos[i] ? "Change" : "Add"}<input type="file" accept="image/*" data-photo="${i}" data-photo-prefix="${prefix}" /></label>
       </div>`
     )
@@ -376,7 +386,7 @@ function profileArticleHtml(p) {
         .map(
           (src, i) => `
         <div class="media">
-          <img src="${esc(latchStorage.resolvePhoto(src))}" alt="${esc(p.name)}" />
+          <img src="${esc(latchStorage.resolvePhoto(src, state.github))}" alt="${esc(p.name)}" />
           ${
             i === 0
               ? `<div class="media-meta"><h2>${esc(p.name)}, ${p.age}</h2>
@@ -823,7 +833,7 @@ function renderProfile() {
   root.innerHTML = `
     <div class="editor">
       ${photoGridHtml("profile")}
-      <p class="muted" style="margin:0;font-size:.85rem">Photos live in IndexedDB here and as separate files on GitHub — not inside board.json — so you can add as many profiles as you want.</p>
+      <p class="muted" style="margin:0;font-size:.85rem">Photos save to GitHub as files, then load on any device. Connect on this computer after you add shots so your phone can see them.</p>
       <label class="stack">First name<input class="field" data-f="name" value="${esc(u.name)}" /></label>
       <label class="stack">Age<input class="field" type="number" min="18" max="99" data-f="age" value="${esc(u.age)}" /></label>
       <label class="stack">I am
@@ -1167,7 +1177,7 @@ function addPhotoPreviewHtml(photos) {
   return `<div class="photo-row six">${[0, 1, 2, 3, 4, 5]
     .map(
       (i) => `<div class="photo-slot">
-        ${photos[i] ? `<img src="${esc(latchStorage.resolvePhoto(photos[i]))}" alt="" />` : ""}
+        ${photos[i] ? `<img src="${esc(latchStorage.resolvePhoto(photos[i], state.github))}" alt="" />` : ""}
         <label>${photos[i] ? "Change" : "Add"}<input type="file" accept="image/*" data-add-photo="${i}" /></label>
       </div>`
     )
