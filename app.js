@@ -288,6 +288,11 @@ function bindNav() {
 }
 
 function setView(view, extra) {
+  const nextId = extra?.chatId || (view === "chat" ? state.chatId : null);
+  if (nextId !== renderChat._id) {
+    renderChat._keepFocus = false;
+    renderChat._id = null;
+  }
   state.view = view;
   if (view !== "chat") state.chatId = null;
   if (extra?.chatId) {
@@ -532,6 +537,30 @@ function renderMessages() {
   });
 }
 
+function chatBubblesHtml(p, msgs) {
+  return `${msgs
+    .map((m) => {
+      const via = m.from === "them" && m.via ? `<i class="via">${m.via === "rules" ? "built-in" : m.via}</i>` : "";
+      return `<div class="bubble ${m.from === "me" ? "me" : "them"}">${esc(m.text)}${via}</div>`;
+    })
+    .join("")}
+        ${
+          state.pendingBots[p.id]
+            ? `<div class="typing">${esc(llmProgress || `${p.name} is typing…`)}</div>`
+            : ""
+        }`;
+}
+
+function focusComposer() {
+  const input = document.querySelector("#composer input[name=text]");
+  if (!input) return;
+  input.focus();
+  const n = input.value.length;
+  try {
+    input.setSelectionRange(n, n);
+  } catch (_) {}
+}
+
 function renderChat(root) {
   const p = profileById(state.chatId);
   if (!p) {
@@ -546,6 +575,21 @@ function renderChat(root) {
     : "Built-in";
   $("page-title").textContent = p.name;
   $("page-sub").textContent = `Active now · ${engineName}`;
+  const reuse = renderChat._id === p.id && root.querySelector("#composer") && root.querySelector("#bubbles");
+  if (reuse) {
+    const pill = root.querySelector(".engine-pill");
+    if (pill) {
+      pill.textContent = engineName;
+      pill.classList.toggle("on", live);
+    }
+    const box = $("bubbles");
+    box.innerHTML = chatBubblesHtml(p, msgs);
+    box.scrollTop = box.scrollHeight;
+    if (renderChat._keepFocus) focusComposer();
+    return;
+  }
+  renderChat._id = p.id;
+  renderChat._keepFocus = false;
   root.innerHTML = `
     <div class="chat">
       <div class="chat-head">
@@ -559,24 +603,17 @@ function renderChat(root) {
         <button class="btn-ghost menu-btn" id="chat-menu" aria-label="Chat options">☰</button>
       </div>
       <div class="bubbles" id="bubbles">
-        ${msgs
-          .map((m) => {
-            const via = m.from === "them" && m.via ? `<i class="via">${m.via === "rules" ? "built-in" : m.via}</i>` : "";
-            return `<div class="bubble ${m.from === "me" ? "me" : "them"}">${esc(m.text)}${via}</div>`;
-          })
-          .join("")}
-        ${
-          state.pendingBots[p.id]
-            ? `<div class="typing">${esc(llmProgress || `${p.name} is typing…`)}</div>`
-            : ""
-        }
+        ${chatBubblesHtml(p, msgs)}
       </div>
       <form class="composer" id="composer">
         <input name="text" maxlength="280" placeholder="Send a message" autocomplete="off" />
         <button type="submit">Send</button>
       </form>
     </div>`;
-  $("back-msg").onclick = () => setView("messages");
+  $("back-msg").onclick = () => {
+    renderChat._keepFocus = false;
+    setView("messages");
+  };
   $("chat-menu").onclick = () => openChatMenu(p);
   const form = $("composer");
   form.onsubmit = (e) => {
@@ -585,6 +622,8 @@ function renderChat(root) {
     const text = input.value.trim();
     if (!text) return;
     input.value = "";
+    renderChat._keepFocus = true;
+    focusComposer();
     sendUserMessage(p.id, text);
   };
   const box = $("bubbles");
@@ -617,7 +656,7 @@ function llmFieldsHtml() {
   const models = llmFieldsHtml.models || spec.curated.concat(cfg.model).filter((v, i, a) => a.indexOf(v) === i);
   return `<div class="prompt-card">
     <p class="q">Chat engine</p>
-    <p class="muted" style="margin:0 0 12px">On a phone we use the 1B model so the tab doesn't die — Hermes 3B is what crashed you after the download. On a computer we use Hermes. Chrome/Edge; some iPhones still lack WebGPU.</p>
+    <p class="muted" style="margin:0 0 12px">Phones stay on the 1B model so the tab lives. We prompt it like a person texting — the desktop rulebook made Llama Instruct sound like a help desk. Computers still get Hermes. Chrome/Edge; some iPhones still lack WebGPU.</p>
     <label class="stack">Provider
       <select class="field" id="llm-provider">
         <option value="local" ${cfg.provider === "local" ? "selected" : ""}>On this device — free, no key</option>
@@ -1221,7 +1260,12 @@ async function queueBotReply(id, userText) {
       })
     : () => {};
   if (useModel) {
-    llmProgress = latchLLM.config().provider === "local" ? "Loading Hermes on this device…" : "Thinking…";
+    llmProgress =
+      latchLLM.config().provider === "local"
+        ? latchLLM.isTightDevice()
+          ? "Loading the phone model…"
+          : "Loading Hermes on this device…"
+        : "Thinking…";
     render();
     try {
       lines = await latchLLM.reply(p, thread, state.user);

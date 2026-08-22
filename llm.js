@@ -267,12 +267,35 @@
     return out;
   }
 
+  function whoLine(p) {
+    return p.gender === "men" ? "man" : p.gender === "women" ? "woman" : "non-binary person";
+  }
+
+  /* 1B Instruct cannot hold the desktop rulebook. A long system prompt makes it
+     sound like a help desk. Keep the phone card under ~120 tokens. */
+  function phonePrompt(p, me) {
+    const you = me && me.name ? me.name : "them";
+    const hooks = (p.prompts || []).filter((x) => x && x.a).slice(0, 2).map((x) => x.a);
+    const s = p.style || {};
+    const voice = [s.tone, s.lower ? "lowercase" : "", s.clip ? "very short" : ""].filter(Boolean).join(", ");
+    return [
+      `You are ${p.name}, ${p.age}, a ${whoLine(p)} in ${p.city}. ${p.job}.`,
+      attractedLine(p),
+      hooks.length ? `True about you: ${hooks.join(" / ")}` : "",
+      `You matched with ${you} on Latch.${voice ? ` You text ${voice}.` : ""}`,
+      `Write the next text you'd send. One short line. Answer them. No asterisks. Never say you are an AI.`
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   function systemPrompt(p, me) {
+    if (isTightDevice()) return phonePrompt(p, me);
     const prompts = (p.prompts || []).map((x) => `- "${x.q}": ${x.a}`).join("\n");
     const you = me && me.name ? me.name : "them";
     const theirs = [me && me.age ? `${me.age}` : "", me && me.gender ? me.gender : "", me && me.orientation ? me.orientation : ""].filter(Boolean).join(", ");
     return [
-      `You are ${p.name}, ${p.age}, a ${p.gender === "men" ? "man" : p.gender === "women" ? "woman" : "non-binary person"} in ${p.city}. You are an adult over 21.`,
+      `You are ${p.name}, ${p.age}, a ${whoLine(p)} in ${p.city}. You are an adult over 21.`,
       `Job: ${p.job}.${p.school ? ` Studied at ${p.school}.` : ""} Height: ${p.height}. On dating apps you say you are "${p.intention}".`,
       prompts ? `Your dating profile answers:\n${prompts}` : "",
       ``,
@@ -301,12 +324,58 @@
       .join("\n");
   }
 
+  function lastUserText(thread) {
+    for (let i = (thread || []).length - 1; i >= 0; i -= 1) {
+      if (thread[i] && thread[i].from === "me" && thread[i].text) return thread[i].text;
+    }
+    return "";
+  }
+
   function toMessages(p, thread, me) {
+    const cap = isTightDevice() ? 8 : 40;
     const history = (thread || [])
       .filter((m) => m && m.text)
-      .slice(-40)
+      .slice(-cap)
       .map((m) => ({ role: m.from === "me" ? "user" : "assistant", content: m.text }));
+    if (isTightDevice()) {
+      if (history.length && history[history.length - 1].role === "user") {
+        history[history.length - 1].content += `\n\n(Reply as ${p.name} — one short text, answer that, no helper voice.)`;
+      } else {
+        history.push({ role: "user", content: `Reply as ${p.name} in one short text.` });
+      }
+    }
     return [{ role: "system", content: systemPrompt(p, me) }, ...history];
+  }
+
+  function scrubLocal(text, p) {
+    let t = String(text || "");
+    t = t.split(/\n(?:User|Them|Human|Assistant|System)\s*:/i)[0];
+    t = t.replace(new RegExp(`^\\s*${(p && p.name) || "Name"}\\s*[:\\-]\\s*`, "i"), "");
+    t = t.replace(/^\s*(sure[,!.]?|of course[,!.]?|absolutely[,!.]?|certainly[,!.]?)\s+/i, "");
+    t = t.replace(/^\s*(here'?s (a |my )?(reply|response|text|message)[:.]\s*)/i, "");
+    t = t.replace(/\*[^*]{1,80}\*/g, "");
+    return t.trim();
+  }
+
+  const WEIRD =
+    /\b(as an ai|language model|i'?d be happy to|i would be happy to|how can i (help|assist)|that'?s a great (question|point|idea)|as \w+ i would say|here('s| is) (a |my )?(reply|response)|sure i can (help|assist|do)|i understand you('re| are)|let me know if you|feel free to (ask|share|tell)|is there anything else|i'?m here to (help|chat|assist)|happy to (help|assist|chat)|as a language)\b/i;
+
+  function isWeird(text) {
+    const t = String(text || "").trim();
+    if (!t) return true;
+    if (WEIRD.test(t)) return true;
+    if (/HARD FACTS|never say you are an AI|Reply as /i.test(t)) return true;
+    return t.split(/\s+/).length > 40;
+  }
+
+  function phoneStyle(lines, p) {
+    const s = p.style || {};
+    return (lines || []).map((l) => {
+      let x = String(l || "").replace(/\s+/g, " ").trim();
+      if (s.lower) x = x.toLowerCase();
+      if (s.clip && x.length > 90) x = (x.split(/(?<=[.!?])\s+/)[0] || x).slice(0, 90);
+      return x;
+    }).filter(Boolean);
   }
 
   function toLines(text) {
@@ -356,19 +425,61 @@
     return call("/chat/completions", { method: "POST", body: JSON.stringify(body) });
   }
 
+  function localOpts(phone) {
+    return phone
+      ? {
+          temperature: 0.7,
+          top_p: 0.88,
+          max_tokens: 64,
+          presence_penalty: 0.4,
+          frequency_penalty: 0.3,
+          stop: ["\nUser:", "\nThem:", "\nHuman:", "User:", "Them:"]
+        }
+      : { temperature: 0.95, max_tokens: 160 };
+  }
+
+  async function salvagePhone(engine, p, thread, me) {
+    const last = lastUserText(thread) || "hey";
+    let hint = "";
+    try {
+      if (typeof latchConverse === "function") {
+        hint = (latchConverse(p, last, thread, me).lines || []).join(" ");
+      }
+    } catch (_) {}
+    const data = await engine.chat.completions.create({
+      messages: [
+        { role: "system", content: phonePrompt(p, me) },
+        {
+          role: "user",
+          content: `${(me && me.name) || "They"} just said: ${last}\nWrite ${p.name}'s next text. One line. Sound like a person, not a chatbot.${hint ? ` Riff on this, don't copy it: ${hint}` : ""}`
+        }
+      ],
+      ...localOpts(true)
+    });
+    return scrubLocal(extractText(data).text, p);
+  }
+
   async function reply(p, thread, me) {
     if (!active()) return null;
     const messages = toMessages(p, thread, me);
     if (config().provider === "local") {
       const engine = await ensureLocal();
-      const data = await engine.chat.completions.create({
-        messages,
-        temperature: 0.95,
-        max_tokens: 160
-      });
-      const { text } = extractText(data);
+      const phone = isTightDevice();
+      const data = await engine.chat.completions.create({ messages, ...localOpts(phone) });
+      let { text } = extractText(data);
+      text = scrubLocal(text, p);
+      if (phone && (isRefusal(text) || isWeird(text))) {
+        try {
+          text = await salvagePhone(engine, p, thread, me);
+        } catch (_) {}
+      }
+      if (phone && (isRefusal(text) || isWeird(text)) && typeof latchConverse === "function") {
+        const salvage = latchConverse(p, lastUserText(thread), thread, me).lines;
+        if (salvage && salvage.length) return salvage;
+      }
       if (isRefusal(text)) throw new Error("On-device model refused. Try Hermes if you were on Llama Instruct.");
-      const lines = toLines(text);
+      let lines = toLines(text);
+      if (phone) lines = phoneStyle(lines, p);
       if (!lines.length) throw new Error("Empty reply from the on-device model.");
       return lines;
     }
