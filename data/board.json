@@ -267,10 +267,9 @@
   },
   "brainReply": {
     "id": "b-mt3x8qoc",
-    "status": "loading",
-    "text": "Hermes host is writing…"
+    "error": "Phone and computer saved at the same time. Try that chat again."
   },
-  "updatedAt": 1787375852041,
+  "updatedAt": 1787375900208,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
