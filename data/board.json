@@ -34,138 +34,14 @@
     ]
   },
   "onboarded": true,
-  "view": "profile",
+  "view": "discover",
   "chatId": null,
-  "skipped": [
-    "hana"
-  ],
+  "skipped": [],
   "liked": [],
-  "matches": [
-    "sasha"
-  ],
+  "matches": [],
   "roses": 5,
-  "threads": {
-    "sasha": [
-      {
-        "from": "them",
-        "text": "Hi. Your profile didn't feel like a pitch deck. Relief.",
-        "ts": 1787368998864
-      },
-      {
-        "from": "me",
-        "text": "Damn, you’re gorgeous",
-        "ts": 1787369004553
-      },
-      {
-        "from": "them",
-        "text": "Thanks! What’s your favorite Austin spot for a Tuesday night?",
-        "ts": 1787369007575,
-        "via": "groq"
-      },
-      {
-        "from": "me",
-        "text": "What about your place? 🤭",
-        "ts": 1787369021062
-      },
-      {
-        "from": "them",
-        "text": "We’re on the same page—how about the food truck park on Thursday? I’ll bring the playlist.",
-        "ts": 1787369025025,
-        "via": "groq"
-      },
-      {
-        "from": "me",
-        "text": "I like that idea, just to confirm… you’re into women right?",
-        "ts": 1787369054691
-      },
-      {
-        "from": "them",
-        "text": "Yes, I am. Looking forward to Thursday!",
-        "ts": 1787369057756,
-        "via": "groq"
-      },
-      {
-        "from": "me",
-        "text": "Will there be desert afterwards? 😏",
-        "ts": 1787369077345
-      },
-      {
-        "from": "them",
-        "text": "Definitely. I’ll bring my signature churros. 😉",
-        "ts": 1787369080492,
-        "via": "groq"
-      },
-      {
-        "from": "me",
-        "text": "Oh yeah?",
-        "ts": 1787369086658
-      },
-      {
-        "from": "them",
-        "text": "Can't wait—dessert will be the highlight!",
-        "ts": 1787369089551,
-        "via": "groq"
-      },
-      {
-        "from": "me",
-        "text": "I hope so. Hope we’re reading each others mind on what desert will be 😏",
-        "ts": 1787369114127
-      },
-      {
-        "from": "them",
-        "text": "Just a guess—maybe you’ll surprise me with something sweet. 😏",
-        "ts": 1787369117563,
-        "via": "groq"
-      },
-      {
-        "from": "me",
-        "text": "Oh it’ll be sweet, imagine… top off… you know",
-        "ts": 1787369144694
-      },
-      {
-        "from": "them",
-        "text": "Sounds delicious. Do you have a favorite dessert spot?",
-        "ts": 1787369147749,
-        "via": "groq"
-      },
-      {
-        "from": "me",
-        "text": "Your bed",
-        "ts": 1787369154797
-      },
-      {
-        "from": "them",
-        "text": "A cozy bed with a good book—keeps the sweet vibes alive. 🌙",
-        "ts": 1787369158011,
-        "via": "groq"
-      },
-      {
-        "from": "me",
-        "text": "Oh no, I’m leaning like… you, me, in your bed, our tops off",
-        "ts": 1787369198464
-      },
-      {
-        "from": "them",
-        "text": "That’s a pretty vivid picture. But I’m more about good conversation first. 😉",
-        "ts": 1787369202485,
-        "via": "groq"
-      },
-      {
-        "from": "me",
-        "text": "So, is that a no?",
-        "ts": 1787369214421
-      },
-      {
-        "from": "them",
-        "text": "No.",
-        "ts": 1787369216038,
-        "via": "groq"
-      }
-    ]
-  },
-  "unread": {
-    "sasha": false
-  },
+  "threads": {},
+  "unread": {},
   "tweaks": {
     "avery": {
       "name": "",
@@ -223,7 +99,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369452486,
+  "updatedAt": 1787369455224,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
