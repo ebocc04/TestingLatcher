@@ -191,7 +191,7 @@
       "intention": "",
       "style": {
         "tone": "",
-        "flirt": 0.5,
+        "flirt": 1,
         "emojiRate": 0.15,
         "bang": 0.25,
         "lower": false,
@@ -201,7 +201,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369158921,
+  "updatedAt": 1787369174278,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
