@@ -154,6 +154,12 @@
         "from": "me",
         "text": "I didn’t want to have to do this… *a spell gets casted on you, making your brain chemistry change, to the gay side* how do you feel now?",
         "ts": 1787369830106
+      },
+      {
+        "from": "them",
+        "text": "I’m still straight, so I’m not feeling any shift.",
+        "ts": 1787369833300,
+        "via": "groq"
       }
     ]
   },
@@ -186,7 +192,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369831013,
+  "updatedAt": 1787369834207,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
