@@ -255,7 +255,7 @@ async function askDesktopBrain(p, thread) {
     const reply = remote.data.brainReply;
     if (!reply || reply.id !== jobId) continue;
     if (reply.status === "loading") {
-      llmProgress = reply.text || "Computer is loading Hermes…";
+      llmProgress = reply.text || "Hermes host is loading…";
       render();
       continue;
     }
@@ -283,7 +283,7 @@ async function processBrainJob() {
   brainWorking = true;
   try {
     if (remote.sha) state.github.sha = remote.sha;
-    await pushBrainPatch({ id: job.id, status: "loading", text: "Loading Hermes…" });
+    await pushBrainPatch({ id: job.id, status: "loading", text: "Hermes host is loading…" });
     const p = profileById(job.profileId);
     if (!p) {
       await pushBrainPatch({ id: job.id, error: "That person isn't on this computer's board." });
@@ -291,7 +291,7 @@ async function processBrainJob() {
     }
     const lines = await latchLLM.reply(p, job.thread, job.user || state.user);
     await pushBrainPatch({ id: job.id, lines, at: Date.now() });
-    setGhStatus("Answered a phone chat");
+    setGhStatus("Answered a Phone link chat");
   } catch (err) {
     try {
       await pushBrainPatch({ id: job.id, error: err.message || "Hermes failed" });
@@ -663,7 +663,7 @@ function renderMessages() {
 function chatBubblesHtml(p, msgs) {
   return `${msgs
     .map((m) => {
-      const via = m.from === "them" && m.via ? `<i class="via">${m.via === "rules" ? "built-in" : m.via}</i>` : "";
+      const via = m.from === "them" && m.via ? `<i class="via">${viaLabel(m.via)}</i>` : "";
       return `<div class="bubble ${m.from === "me" ? "me" : "them"}">${esc(m.text)}${via}</div>`;
     })
     .join("")}
@@ -692,10 +692,7 @@ function renderChat(root) {
     return;
   }
   const msgs = state.threads[p.id] || [];
-  const live = window.latchLLM && latchLLM.active();
-  const engineName = live
-    ? { local: "On-device", openrouter: "OpenRouter", groq: "Groq" }[latchLLM.config().provider] || "Model"
-    : "Built-in";
+  const engineName = chatEngineLabel();
   $("page-title").textContent = p.name;
   $("page-sub").textContent = `Active now · ${engineName}`;
   const reuse = renderChat._id === p.id && root.querySelector("#composer") && root.querySelector("#bubbles");
@@ -703,7 +700,7 @@ function renderChat(root) {
     const pill = root.querySelector(".engine-pill");
     if (pill) {
       pill.textContent = engineName;
-      pill.classList.toggle("on", live);
+      pill.classList.toggle("on", engineName !== "built-in");
     }
     const box = $("bubbles");
     box.innerHTML = chatBubblesHtml(p, msgs);
@@ -722,7 +719,7 @@ function renderChat(root) {
           <strong>${esc(p.name)}, ${p.age}</strong>
           <div class="muted" style="font-size:.8rem">${esc(orientationLabel(p.orientation))} · ${esc(p.job)}</div>
         </div>
-        <span class="engine-pill ${live ? "on" : ""}">${engineName}</span>
+        <span class="engine-pill ${engineName !== "built-in" ? "on" : ""}">${engineName}</span>
         <button class="btn-ghost menu-btn" id="chat-menu" aria-label="Chat options">☰</button>
       </div>
       <div class="bubbles" id="bubbles">
@@ -753,20 +750,34 @@ function renderChat(root) {
   box.scrollTop = box.scrollHeight;
 }
 
+function viaLabel(via) {
+  if (via === "hermes") return "Hermes host";
+  if (via === "rules") return "built-in";
+  return via || "";
+}
+
+function chatEngineLabel() {
+  if (!(window.latchLLM && latchLLM.active())) return "built-in";
+  if (latchLLM.isTightDevice()) return canUseBrain() ? "Phone link" : "built-in";
+  if (latchLLM.config().provider === "local") return "Hermes host";
+  return { openrouter: "OpenRouter", groq: "Groq" }[latchLLM.config().provider] || "Model";
+}
+
 function githubFieldsHtml() {
   const g = state.github.owner ? state.github : latchStorage.inferTarget();
   state.github = { ...g, sha: state.github.sha || null };
   const token = latchStorage.getToken();
   const connected = Boolean(token && g.owner && g.repo);
+  const phone = window.latchLLM && latchLLM.isTightDevice();
   return `<div class="prompt-card">
-    <p class="q">Connect GitHub</p>
-    <p class="muted" style="margin:0 0 12px">Paste a token. This site already knows it saves to <b>${esc(g.owner)}/${esc(g.repo)}</b>. Photos go in <b>data/photos/</b>, so the board stays small no matter how many profiles you add.</p>
+    <p class="q">Board sync</p>
+    <p class="muted" style="margin:0 0 12px">Same token on <b>Hermes host</b> (computer) and <b>Phone link</b> (phone). Saves the board and photos to <b>${esc(g.owner)}/${esc(g.repo)}</b>.</p>
     <label class="stack">Token
       <input class="field" type="password" id="gh-token" value="${esc(token)}" placeholder="Paste token" autocomplete="off" />
     </label>
-    <p class="muted" data-gh-status style="margin:8px 0 0">${connected ? `Ready — ${esc(g.owner)}/${esc(g.repo)}` : "Not connected"}</p>
+    <p class="muted" data-gh-status style="margin:8px 0 0">${connected ? `Board sync on — ${esc(g.owner)}/${esc(g.repo)}` : "Board sync off"}</p>
     <div class="row" style="justify-content:flex-start;margin-top:12px">
-      <button type="button" class="btn-primary" id="gh-connect">Connect</button>
+      <button type="button" class="btn-primary" id="gh-connect">${phone ? "Connect this phone" : "Connect this computer"}</button>
     </div>
   </div>`;
 }
@@ -777,16 +788,26 @@ function llmFieldsHtml() {
   const on = latchLLM.active();
   const spec = latchLLM.providers[cfg.provider];
   const models = llmFieldsHtml.models || spec.curated.concat(cfg.model).filter((v, i, a) => a.indexOf(v) === i);
+  if (latchLLM.isTightDevice()) {
+    return `<div class="prompt-card">
+      <p class="q">Phone link</p>
+      <p class="muted" style="margin:0 0 12px">This phone does not run the AI. It asks <b>Hermes host</b> on your computer. Connect <b>Board sync</b> above, then leave Latch open on the PC.</p>
+      <label class="check"><input type="checkbox" id="llm-off" ${on ? "" : "checked"} /> don't wait — use built-in replies</label>
+      <p class="muted" data-llm-status style="margin:8px 0 0">${
+        !on
+          ? "Phone link off — built-in replies"
+          : canUseBrain()
+            ? "Phone link on — waiting for Hermes host"
+            : "Phone link needs Board sync first"
+      }</p>
+    </div>`;
+  }
   return `<div class="prompt-card">
-    <p class="q">Chat engine</p>
-    <p class="muted" style="margin:0 0 12px">${
-      latchLLM.isTightDevice()
-        ? "This phone asks your computer for Hermes replies. Leave Latch open on the PC (same GitHub Connect). If the PC is off, chats use the built-in voice — we don't load Qwen here anymore, it was crashing the tab."
-        : "This computer runs Hermes. Leave this tab open so your phone can borrow it. Chrome/Edge."
-    }</p>
+    <p class="q">Hermes host</p>
+    <p class="muted" style="margin:0 0 12px">This computer runs the AI. Keep this tab open so <b>Phone link</b> can use it. Chrome or Edge.</p>
     <label class="stack">Provider
       <select class="field" id="llm-provider">
-        <option value="local" ${cfg.provider === "local" ? "selected" : ""}>On this device — free, no key</option>
+        <option value="local" ${cfg.provider === "local" ? "selected" : ""}>Hermes on this computer — free, no key</option>
         <option value="openrouter" ${cfg.provider === "openrouter" ? "selected" : ""}>OpenRouter free models — free account, no credits</option>
         <option value="groq" ${cfg.provider === "groq" ? "selected" : ""}>Groq — free, refuses flirty chat</option>
       </select>
@@ -803,18 +824,12 @@ function llmFieldsHtml() {
         .map((m) => `<option value="${esc(m)}" ${m === cfg.model ? "selected" : ""}>${esc(m)}</option>`)
         .join("")}</select>
     </label>
-    <label class="check" style="margin-top:10px"><input type="checkbox" id="llm-off" ${on ? "" : "checked"} /> use built-in replies instead</label>
+    <label class="check" style="margin-top:10px"><input type="checkbox" id="llm-off" ${on ? "" : "checked"} /> stop hosting — use built-in replies</label>
     <p class="muted" data-llm-status style="margin:8px 0 0">${
-      !on
-        ? "Off — using built-in replies"
-        : latchLLM.isTightDevice()
-          ? canUseBrain()
-            ? "Phone will use Hermes on your computer"
-            : "Connect GitHub so this phone can use Hermes on your computer"
-          : `Live — ${esc(cfg.model)} — phone chats run here`
+      on ? `Hermes host on — ${esc(cfg.model)}` : "Hermes host off — built-in replies"
     }</p>
     <div class="row" style="justify-content:flex-start;margin-top:12px">
-      <button type="button" class="btn-primary" id="llm-connect">Connect</button>
+      <button type="button" class="btn-primary" id="llm-connect">Start Hermes host</button>
       <button type="button" class="btn-ghost" id="llm-test">Test a reply</button>
     </div>
   </div>`;
@@ -831,7 +846,17 @@ function bindLlm(root) {
   const provEl = root.querySelector("#llm-provider");
   root.querySelector("#llm-off")?.addEventListener("change", (e) => {
     latchLLM.setConfig({ enabled: !e.target.checked });
-    setLlmStatus(latchLLM.active() ? `Live — ${latchLLM.config().model}` : "Off — using built-in replies");
+    setLlmStatus(
+      latchLLM.active()
+        ? latchLLM.isTightDevice()
+          ? canUseBrain()
+            ? "Phone link on — waiting for Hermes host"
+            : "Phone link needs Board sync first"
+          : `Hermes host on — ${latchLLM.config().model}`
+        : latchLLM.isTightDevice()
+          ? "Phone link off — built-in replies"
+          : "Hermes host off — built-in replies"
+    );
   });
   provEl?.addEventListener("change", () => {
     const spec = latchLLM.providers[provEl.value];
@@ -848,18 +873,18 @@ function bindLlm(root) {
     latchLLM.setConfig({ provider, enabled: true });
     if (provider !== "local") {
       if (!keyEl || !keyEl.value.trim()) {
-        setLlmStatus("Paste a free API key, or switch to On this device.");
+        setLlmStatus("Paste a free API key, or switch to Hermes on this computer.");
         return;
       }
       latchLLM.setKey(keyEl.value);
     }
-    setLlmStatus(provider === "local" ? "Downloading the model… first time is a couple GB." : "Checking key…");
+    setLlmStatus(provider === "local" ? "Starting Hermes host… first time is a couple GB." : "Checking key…");
     const stop = latchLLM.onProgress((text) => setLlmStatus(text || "Loading…"));
     try {
       if (provider === "local") {
         await latchLLM.ensureLocal();
         latchLLM.setConfig({ localReady: true, enabled: true });
-        toast("On-device model ready");
+        toast("Hermes host ready — leave this tab open");
       } else {
         const models = await latchLLM.listModels();
         llmFieldsHtml.models = models;
@@ -944,7 +969,7 @@ function renderProfile() {
   root.innerHTML = `
     <div class="editor">
       ${photoGridHtml("profile")}
-      <p class="muted" style="margin:0;font-size:.85rem">Photos save to GitHub as files, then load on any device. Connect on this computer after you add shots so your phone can see them.</p>
+      <p class="muted" style="margin:0;font-size:.85rem">Photos ride with <b>Board sync</b>. Add them here, then open <b>Phone link</b> on your phone.</p>
       <label class="stack">First name<input class="field" data-f="name" value="${esc(u.name)}" /></label>
       <label class="stack">Age<input class="field" type="number" min="18" max="99" data-f="age" value="${esc(u.age)}" /></label>
       <label class="stack">I am
@@ -1749,7 +1774,7 @@ async function queueBotReply(id, userText) {
   let lines = null;
   let via = "rules";
   if (canUseBrain()) {
-    llmProgress = "Waiting for your computer…";
+    llmProgress = "Waiting for Hermes host…";
     render();
     try {
       lines = await askDesktopBrain(p, thread);
@@ -1759,7 +1784,7 @@ async function queueBotReply(id, userText) {
     }
     llmProgress = "";
     if (!lines) {
-      toast("Computer didn't answer — using built-in replies. Leave Latch open on the PC.");
+      toast("Hermes host didn't answer — using built-in replies. Leave Latch open on the computer.");
       lines = latchConverse(p, userText, thread, state.user).lines;
       via = "rules";
     }
@@ -1925,7 +1950,7 @@ function renderOnboard() {
       </label>
       <div class="wiz-nav">${back}${next}</div>`;
   } else {
-    body = `<h2>Save your board</h2><p>Optional. Paste a GitHub token and hit Connect — that's it. Skip if you only want this phone/browser.</p>
+    body = `<h2>Board sync</h2><p>Optional. Same token on the computer (<b>Hermes host</b>) and the phone (<b>Phone link</b>). Skip if you only want this device.</p>
       ${githubFieldsHtml()}
       <div class="wiz-nav">${back}<button type="button" class="btn-primary" data-wiz="done">Start discovering</button></div>`;
   }
