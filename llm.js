@@ -14,13 +14,14 @@
     local: {
       label: "On this device",
       defaultModel: "Hermes-3-Llama-3.2-3B-q4f16_1-MLC",
+      phoneModel: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
       keyHint: "",
       signup: "",
       extras: () => ({}),
       curated: [
+        "Llama-3.2-1B-Instruct-q4f16_1-MLC",
         "Hermes-3-Llama-3.2-3B-q4f16_1-MLC",
-        "Llama-3.2-3B-Instruct-q4f16_1-MLC",
-        "Llama-3.2-1B-Instruct-q4f16_1-MLC"
+        "Llama-3.2-3B-Instruct-q4f16_1-MLC"
       ]
     },
     openrouter: {
@@ -51,6 +52,37 @@
     return "local";
   };
 
+  /* Hermes 3B downloads on a phone, then the tab is killed when WebGPU allocates.
+     That is an OOM crash, not "mobile can't run models." 1B fits in phone RAM. */
+  const PHONE_MODEL = PROVIDERS.local.phoneModel;
+  const DESK_MODEL = PROVIDERS.local.defaultModel;
+  const OOM_KEY = "latch-llm-oom";
+  const LOADING_KEY = "latch-llm-loading";
+
+  try {
+    const pending = sessionStorage.getItem(LOADING_KEY);
+    if (pending) {
+      localStorage.setItem(OOM_KEY, pending);
+      sessionStorage.removeItem(LOADING_KEY);
+    }
+  } catch (_) {}
+
+  function isTightDevice() {
+    const ua = navigator.userAgent || "";
+    const mobile = /Android|iPhone|iPad|iPod|Mobile|webOS/i.test(ua);
+    const mem = navigator.deviceMemory;
+    let oom = "";
+    try {
+      oom = localStorage.getItem(OOM_KEY) || "";
+    } catch (_) {}
+    return mobile || (typeof mem === "number" && mem <= 4) || Boolean(oom);
+  }
+
+  function pickLocalModel(wanted) {
+    if (isTightDevice()) return PHONE_MODEL;
+    return /MLC/.test(wanted || "") ? wanted : DESK_MODEL;
+  }
+
   const getKey = () => {
     try {
       return localStorage.getItem(KEY) || "";
@@ -79,7 +111,7 @@
     if (provider === "groq" && !/^(openai\/|llama|meta-llama|qwen)/i.test(model) && model.includes("/")) {
       if (!model.startsWith("openai/")) model = spec.defaultModel;
     }
-    if (provider === "local" && !/MLC/.test(model)) model = spec.defaultModel;
+    if (provider === "local") model = pickLocalModel(model);
     return { enabled: true, ...saved, provider, model };
   }
 
@@ -113,20 +145,45 @@
   };
 
   async function ensureLocal(modelId) {
-    const id = modelId || config().model;
+    const id = pickLocalModel(modelId || config().model);
     if (localEngine && localEngine._modelId === id) return localEngine;
     if (localLoading) return localLoading;
-    if (!navigator.gpu) throw new Error("This browser has no WebGPU. Use Chrome or Edge on a computer — iPhone Safari can't run the free on-device model.");
     localLoading = (async () => {
+      try {
+        sessionStorage.setItem(LOADING_KEY, id);
+      } catch (_) {}
+      emitProgress({ text: isTightDevice() ? "Loading the phone-sized model…" : "Loading Hermes…", progress: 0 });
       const webllm = await import("https://esm.run/@mlc-ai/web-llm");
-      const engine = await webllm.CreateMLCEngine(id, { initProgressCallback: emitProgress });
+      let engine;
+      try {
+        if (webllm.CreateWebWorkerMLCEngine) {
+          const worker = new Worker("webllm-worker.js", { type: "module" });
+          engine = await webllm.CreateWebWorkerMLCEngine(worker, id, { initProgressCallback: emitProgress });
+        } else {
+          engine = await webllm.CreateMLCEngine(id, { initProgressCallback: emitProgress });
+        }
+      } catch (first) {
+        /* Worker path can fail on some phones; retry on the main thread with the tiny model. */
+        engine = await webllm.CreateMLCEngine(isTightDevice() ? PHONE_MODEL : id, { initProgressCallback: emitProgress });
+      }
       engine._modelId = id;
+      try {
+        sessionStorage.removeItem(LOADING_KEY);
+      } catch (_) {}
       localEngine = engine;
       localLoading = null;
       return engine;
     })().catch((err) => {
       localLoading = null;
-      throw err;
+      try {
+        sessionStorage.removeItem(LOADING_KEY);
+        localStorage.setItem(OOM_KEY, id);
+      } catch (_) {}
+      throw new Error(
+        /gpu|webgpu|WebGPU/i.test(err.message || "")
+          ? "This browser has no WebGPU. Chrome or Edge on Android can do it; older iPhones often can't."
+          : err.message || "On-device model failed to start."
+      );
     });
     return localLoading;
   }
@@ -347,6 +404,8 @@
     systemPrompt,
     ensureLocal,
     onProgress,
+    pickLocalModel,
+    isTightDevice,
     providers: PROVIDERS,
     get DEFAULT_MODEL() {
       return spec().defaultModel;

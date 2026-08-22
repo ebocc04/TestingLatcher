@@ -104,10 +104,10 @@ let onboardStep = 0;
 let saveTimer = null;
 let ghBusy = false;
 let llmProgress = "";
-if (window.latchLLM && latchLLM.config().provider !== "local") {
+if (window.latchLLM) {
   latchLLM.setConfig({
     provider: "local",
-    model: latchLLM.providers.local.defaultModel,
+    model: latchLLM.pickLocalModel(),
     enabled: true
   });
 }
@@ -617,7 +617,7 @@ function llmFieldsHtml() {
   const models = llmFieldsHtml.models || spec.curated.concat(cfg.model).filter((v, i, a) => a.indexOf(v) === i);
   return `<div class="prompt-card">
     <p class="q">Chat engine</p>
-    <p class="muted" style="margin:0 0 12px">Nothing here costs money. <b>On this device</b> downloads Hermes (~2GB, once) and runs in Chrome/Edge — no key. <b>OpenRouter free</b> needs only a free account, no credits. Groq is also free but refuses flirty chat.</p>
+    <p class="muted" style="margin:0 0 12px">On a phone we use the 1B model so the tab doesn't die — Hermes 3B is what crashed you after the download. On a computer we use Hermes. Chrome/Edge; some iPhones still lack WebGPU.</p>
     <label class="stack">Provider
       <select class="field" id="llm-provider">
         <option value="local" ${cfg.provider === "local" ? "selected" : ""}>On this device — free, no key</option>
