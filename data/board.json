@@ -34,14 +34,39 @@
     ]
   },
   "onboarded": true,
-  "view": "discover",
-  "chatId": null,
-  "skipped": [],
+  "view": "chat",
+  "chatId": "sasha",
+  "skipped": [
+    "hana"
+  ],
   "liked": [],
-  "matches": [],
+  "matches": [
+    "sasha"
+  ],
   "roses": 5,
-  "threads": {},
-  "unread": {},
+  "threads": {
+    "sasha": [
+      {
+        "from": "them",
+        "text": "Hi. Your profile didn't feel like a pitch deck. Relief.",
+        "ts": 1787368998864
+      },
+      {
+        "from": "me",
+        "text": "Damn, you’re gorgeous",
+        "ts": 1787369004553
+      },
+      {
+        "from": "them",
+        "text": "Thanks! What’s your favorite Austin spot for a Tuesday night?",
+        "ts": 1787369007575,
+        "via": "groq"
+      }
+    ]
+  },
+  "unread": {
+    "sasha": false
+  },
   "tweaks": {
     "avery": {
       "name": "",
@@ -81,7 +106,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787368985238,
+  "updatedAt": 1787369008485,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
