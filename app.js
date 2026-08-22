@@ -63,6 +63,8 @@ function openTo(person, targetGender) {
   return true;
 }
 
+const defaultGithub = () => latchStorage.inferTarget();
+
 function emptyState() {
   return {
     user: defaultUser(),
