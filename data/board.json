@@ -33,104 +33,18 @@
       }
     ]
   },
-  "onboarded": true,
-  "view": "profile",
+  "onboarded": false,
+  "view": "discover",
   "chatId": null,
   "skipped": [],
   "liked": [],
-  "matches": [
-    "nina"
-  ],
+  "matches": [],
   "roses": 5,
-  "threads": {
-    "nina": [
-      {
-        "from": "them",
-        "text": "Hi hi. If we match I'm legally required to ask your pastry allegiance.",
-        "ts": 1787363902131
-      },
-      {
-        "from": "me",
-        "text": "My pastry allegiance?",
-        "ts": 1787363926697
-      },
-      {
-        "from": "them",
-        "text": "correct answer is always laminated dough. fight me.",
-        "ts": 1787363929176
-      },
-      {
-        "from": "me",
-        "text": "lol what?",
-        "ts": 1787363940666
-      },
-      {
-        "from": "them",
-        "text": "you talk to service staff like they're people. bar is on the floor.",
-        "ts": 1787363943793
-      },
-      {
-        "from": "me",
-        "text": "Please tell me you’re into women",
-        "ts": 1787363978493
-      },
-      {
-        "from": "them",
-        "text": "Straight, so it's men for me.",
-        "ts": 1787363980248
-      },
-      {
-        "from": "them",
-        "text": "You?",
-        "ts": 1787363981005
-      },
-      {
-        "from": "me",
-        "text": "Girls 99.99% of the time",
-        "ts": 1787363996392
-      },
-      {
-        "from": "them",
-        "text": "I cook about four things well and order the rest.",
-        "ts": 1787363999249
-      },
-      {
-        "from": "me",
-        "text": "You telling me you never tried?",
-        "ts": 1787364010571
-      },
-      {
-        "from": "them",
-        "text": "You pick the dessert. That's a personality test, sorry.",
-        "ts": 1787364013079
-      }
-    ]
-  },
-  "unread": {
-    "nina": false
-  },
-  "tweaks": {
-    "nina": {
-      "name": "",
-      "age": "",
-      "city": "",
-      "job": "",
-      "gender": "",
-      "orientation": "straight",
-      "intention": "",
-      "style": {
-        "tone": "",
-        "flirt": 1,
-        "emojiRate": 0.15,
-        "bang": 0.25,
-        "lower": false,
-        "clip": false,
-        "pace": ""
-      }
-    }
-  },
+  "threads": {},
+  "unread": {},
+  "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787364337003,
+  "updatedAt": 1787364342299,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
