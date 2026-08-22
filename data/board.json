@@ -73,6 +73,16 @@
         "from": "me",
         "text": "Please tell me you’re into women",
         "ts": 1787363978493
+      },
+      {
+        "from": "them",
+        "text": "Straight, so it's men for me.",
+        "ts": 1787363980248
+      },
+      {
+        "from": "them",
+        "text": "You?",
+        "ts": 1787363981005
       }
     ]
   },
@@ -100,7 +110,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787363979401,
+  "updatedAt": 1787363981910,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
