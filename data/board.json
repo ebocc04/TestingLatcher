@@ -34,14 +34,28 @@
     ]
   },
   "onboarded": true,
-  "view": "discover",
-  "chatId": null,
-  "skipped": [],
+  "view": "chat",
+  "chatId": "sasha",
+  "skipped": [
+    "hana"
+  ],
   "liked": [],
-  "matches": [],
+  "matches": [
+    "sasha"
+  ],
   "roses": 5,
-  "threads": {},
-  "unread": {},
+  "threads": {
+    "sasha": [
+      {
+        "from": "them",
+        "text": "Hi. Your profile didn't feel like a pitch deck. Relief.",
+        "ts": 1787365240641
+      }
+    ]
+  },
+  "unread": {
+    "sasha": false
+  },
   "tweaks": {
     "avery": {
       "name": "",
@@ -83,7 +97,7 @@
   "unmatched": [
     "nina"
   ],
-  "updatedAt": 1787365238675,
+  "updatedAt": 1787365241544,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
