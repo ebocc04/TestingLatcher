@@ -985,40 +985,71 @@ function unmatch(p) {
 
 const TONES = ["playful", "dry", "warm", "thoughtful", "direct", "witty", "soft", "quiet", "grounded", "easy"];
 
-/* Everything here writes into state.tweaks[id], which applyTweaks() layers over the
-   original profile — so edits show up in Discover, Likes and the reply planner alike. */
+/* Prefill with the values chat actually uses (original + any saved tweak), and write
+   on every change. The back arrow used to close without saving, which is why
+   sexuality and flirtiness looked like they did nothing. */
+function readPersonAdmin(base) {
+  const val = (id) => ($(id)?.value || "").trim();
+  const next = {
+    name: val("a-name"),
+    age: val("a-age"),
+    city: val("a-city"),
+    job: val("a-job"),
+    gender: val("a-gender"),
+    orientation: val("a-orientation"),
+    intention: val("a-intention"),
+    prompts: (base.prompts || []).map((_, i) => val(`a-prompt-${i}`)),
+    style: {
+      tone: val("a-tone"),
+      flirt: Number(($("a-flirt") || {}).value || 50) / 100,
+      emojiRate: Number(($("a-emoji") || {}).value || 15) / 100,
+      bang: Number(($("a-bang") || {}).value || 25) / 100,
+      lower: Boolean($("a-lower") && $("a-lower").checked),
+      clip: Boolean($("a-clip") && $("a-clip").checked),
+      pace: val("a-pace")
+    }
+  };
+  if (!next.prompts.some(Boolean)) delete next.prompts;
+  return next;
+}
+
+function persistPersonAdmin(base, opts = {}) {
+  state.tweaks[base.id] = readPersonAdmin(base);
+  save({ skipRemote: !opts.remote });
+}
+
 function openPersonAdmin(p) {
-  const t = { ...(state.tweaks[p.id] || {}) };
-  const style = { ...(t.style || {}) };
+  const live = applyTweaks(window.LATCH_PROFILES.find((x) => x.id === p.id) || p);
+  const style = live.style || {};
   const modal = $("modal");
   modal.classList.remove("hidden");
   modal.innerHTML = `<div class="sheet sheet-full">
     <div class="sheet-bar">
       <button class="btn-ghost" id="cancel-m" aria-label="Close">←</button>
-      <strong>Admin · ${esc(p.name)}</strong>
+      <strong>Admin · ${esc(live.name)}</strong>
     </div>
     <div class="sheet-scroll admin-form">
-      <p class="muted">Overrides for this person only. Blank means "use the original."</p>
-      <label>Name<input id="a-name" value="${esc(t.name ?? "")}" placeholder="${esc(p.name)}" /></label>
+      <p class="muted">Changes save as you go and apply to the next message. After changing sexuality, old chat lines may still contradict — clear the conversation if they do.</p>
+      <label>Name<input id="a-name" value="${esc(live.name)}" /></label>
       <div class="two">
-        <label>Age<input id="a-age" type="number" min="18" max="99" value="${esc(t.age ?? "")}" placeholder="${p.age}" /></label>
-        <label>City<input id="a-city" value="${esc(t.city ?? "")}" placeholder="${esc(p.city)}" /></label>
+        <label>Age<input id="a-age" type="number" min="18" max="99" value="${esc(live.age)}" /></label>
+        <label>City<input id="a-city" value="${esc(live.city)}" /></label>
       </div>
-      <label>Job<input id="a-job" value="${esc(t.job ?? "")}" placeholder="${esc(p.job)}" /></label>
+      <label>Job<input id="a-job" value="${esc(live.job)}" /></label>
       <div class="two">
-        <label>Gender<select id="a-gender">${["", "women", "men", "nonbinary"]
-          .map((g) => `<option value="${g}" ${t.gender === g ? "selected" : ""}>${g ? genderLabel(g) : "Original"}</option>`)
+        <label>Gender<select id="a-gender">${["women", "men", "nonbinary"]
+          .map((g) => `<option value="${g}" ${live.gender === g ? "selected" : ""}>${genderLabel(g)}</option>`)
           .join("")}</select></label>
-        <label>Sexuality<select id="a-orientation">${["", ...ORIENTATIONS.map(([v]) => v)]
-          .map((o) => `<option value="${o}" ${t.orientation === o ? "selected" : ""}>${o ? orientationLabel(o) : "Original"}</option>`)
-          .join("")}</select></label>
+        <label>Sexuality<select id="a-orientation">${ORIENTATIONS.map(
+          ([v, l]) => `<option value="${v}" ${live.orientation === v ? "selected" : ""}>${l}</option>`
+        ).join("")}</select></label>
       </div>
-      <label>Looking for<input id="a-intention" value="${esc(t.intention ?? "")}" placeholder="${esc(p.intention)}" /></label>
+      <label>Looking for<input id="a-intention" value="${esc(live.intention)}" /></label>
 
       <h4>Personality</h4>
-      <label>Chat tone<select id="a-tone">${["", ...TONES]
-        .map((x) => `<option value="${x}" ${style.tone === x ? "selected" : ""}>${x ? x[0].toUpperCase() + x.slice(1) : "Original"}</option>`)
-        .join("")}</select></label>
+      <label>Chat tone<select id="a-tone">${TONES.map(
+        (x) => `<option value="${x}" ${(style.tone || "playful") === x ? "selected" : ""}>${x[0].toUpperCase() + x.slice(1)}</option>`
+      ).join("")}</select></label>
       <label>Flirtiness <span class="muted">${Math.round((style.flirt ?? 0.5) * 100)}%</span>
         <input id="a-flirt" type="range" min="0" max="100" value="${Math.round((style.flirt ?? 0.5) * 100)}" /></label>
       <label>Emoji <span class="muted">${Math.round((style.emojiRate ?? 0.15) * 100)}%</span>
@@ -1028,71 +1059,47 @@ function openPersonAdmin(p) {
       <label class="check"><input id="a-lower" type="checkbox" ${style.lower ? "checked" : ""} /> types in lowercase</label>
       <label class="check"><input id="a-clip" type="checkbox" ${style.clip ? "checked" : ""} /> keeps replies short</label>
       <label>Reply speed<select id="a-pace">${[
-        ["", "Original"],
         ["fast", "Fast — replies immediately"],
         ["normal", "Normal"],
         ["slow", "Slow — makes you wait"]
       ]
-        .map(([v, l]) => `<option value="${v}" ${style.pace === v ? "selected" : ""}>${l}</option>`)
+        .map(([v, l]) => `<option value="${v}" ${(style.pace || "normal") === v ? "selected" : ""}>${l}</option>`)
         .join("")}</select></label>
 
       <h4>Prompts</h4>
-      ${p.prompts
-        .map(
-          (q, i) => `<label>${esc(q.q)}<textarea id="a-prompt-${i}" rows="2" placeholder="${esc(q.a)}">${esc(
-            (t.prompts && t.prompts[i]) || ""
-          )}</textarea></label>`
-        )
+      ${live.prompts
+        .map((q, i) => `<label>${esc(q.q)}<textarea id="a-prompt-${i}" rows="2">${esc(q.a)}</textarea></label>`)
         .join("")}
     </div>
-    <div class="sheet-foot three">
-      <button class="btn-ghost" id="a-reset">Reset</button>
-      <button class="btn-ghost" id="a-cancel">Cancel</button>
-      <button class="btn-primary" id="a-save">Save</button>
+    <div class="sheet-foot">
+      <button class="btn-ghost" id="a-reset">Reset to original</button>
+      <button class="btn-primary" id="a-done">Done</button>
     </div>
   </div>`;
-  const close = () => closeModal();
-  $("cancel-m").onclick = close;
-  $("a-cancel").onclick = close;
+  const finish = () => {
+    persistPersonAdmin(p, { remote: true });
+    closeModal();
+    toast(`${(state.tweaks[p.id] && state.tweaks[p.id].name) || p.name} saved`);
+    render();
+  };
+  $("cancel-m").onclick = finish;
+  $("a-done").onclick = finish;
+  const dirty = () => persistPersonAdmin(p);
+  modal.querySelectorAll("input, select, textarea").forEach((el) => {
+    el.addEventListener("input", dirty);
+    el.addEventListener("change", dirty);
+  });
   modal.querySelectorAll('input[type="range"]').forEach((r) => {
-    r.oninput = () => {
+    r.addEventListener("input", () => {
       const out = r.parentElement.querySelector(".muted");
       if (out) out.textContent = `${r.value}%`;
-    };
+    });
   });
   $("a-reset").onclick = () => {
     delete state.tweaks[p.id];
     save();
     closeModal();
     toast(`${p.name} reset to original`);
-    render();
-  };
-  $("a-save").onclick = () => {
-    const val = (id) => $(id).value.trim();
-    const next = {
-      name: val("a-name"),
-      age: val("a-age"),
-      city: val("a-city"),
-      job: val("a-job"),
-      gender: val("a-gender"),
-      orientation: val("a-orientation"),
-      intention: val("a-intention"),
-      prompts: p.prompts.map((_, i) => val(`a-prompt-${i}`)),
-      style: {
-        tone: val("a-tone"),
-        flirt: Number($("a-flirt").value) / 100,
-        emojiRate: Number($("a-emoji").value) / 100,
-        bang: Number($("a-bang").value) / 100,
-        lower: $("a-lower").checked,
-        clip: $("a-clip").checked,
-        pace: val("a-pace")
-      }
-    };
-    if (!next.prompts.some(Boolean)) delete next.prompts;
-    state.tweaks[p.id] = next;
-    save();
-    closeModal();
-    toast(`${next.name || p.name} updated`);
     render();
   };
 }
