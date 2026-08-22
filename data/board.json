@@ -33,8 +33,8 @@
       }
     ]
   },
-  "onboarded": false,
-  "view": "discover",
+  "onboarded": true,
+  "view": "profile",
   "chatId": null,
   "skipped": [],
   "liked": [],
@@ -44,7 +44,7 @@
   "unread": {},
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787364350502,
+  "updatedAt": 1787364383309,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
