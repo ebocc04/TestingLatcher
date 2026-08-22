@@ -90,6 +90,21 @@
         "from": "me",
         "text": "lol just had to double check, some chicks on here say lesbian but then tell me their straight",
         "ts": 1787365318178
+      },
+      {
+        "from": "them",
+        "text": "Okay that got me!",
+        "ts": 1787365342735
+      },
+      {
+        "from": "them",
+        "text": "What's the last thing that genuinely annoyed you? Small and petty preferred.",
+        "ts": 1787365345815
+      },
+      {
+        "from": "me",
+        "text": "You not asking to makeout right now",
+        "ts": 1787365365931
       }
     ]
   },
@@ -137,7 +152,7 @@
   "unmatched": [
     "nina"
   ],
-  "updatedAt": 1787365319082,
+  "updatedAt": 1787365366836,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
