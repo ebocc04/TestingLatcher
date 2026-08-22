@@ -154,6 +154,12 @@
         "from": "me",
         "text": "So, is that a no?",
         "ts": 1787369214421
+      },
+      {
+        "from": "them",
+        "text": "No.",
+        "ts": 1787369216038,
+        "via": "groq"
       }
     ]
   },
@@ -217,7 +223,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369215327,
+  "updatedAt": 1787369216946,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
