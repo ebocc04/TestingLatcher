@@ -34,8 +34,8 @@
     ]
   },
   "onboarded": false,
-  "view": "chat",
-  "chatId": "nina",
+  "view": "profile",
+  "chatId": null,
   "skipped": [],
   "liked": [],
   "matches": [
@@ -130,7 +130,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787364013984,
+  "updatedAt": 1787364020252,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
