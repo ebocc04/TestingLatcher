@@ -72,10 +72,28 @@
         "clip": false,
         "pace": ""
       }
+    },
+    "nina": {
+      "name": "",
+      "age": "",
+      "city": "",
+      "job": "",
+      "gender": "",
+      "orientation": "straight",
+      "intention": "",
+      "style": {
+        "tone": "",
+        "flirt": 0.5,
+        "emojiRate": 0.15,
+        "bang": 0.25,
+        "lower": false,
+        "clip": false,
+        "pace": ""
+      }
     }
   },
   "unmatched": [],
-  "updatedAt": 1787365165614,
+  "updatedAt": 1787365172269,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
