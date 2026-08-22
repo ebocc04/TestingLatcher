@@ -35,7 +35,7 @@
   },
   "onboarded": true,
   "view": "chat",
-  "chatId": "sasha",
+  "chatId": "maya",
   "skipped": [
     "avery",
     "hana"
@@ -138,7 +138,7 @@
     "maya": false,
     "sasha": false
   },
-  "updatedAt": 1787362443011,
+  "updatedAt": 1787362445793,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
