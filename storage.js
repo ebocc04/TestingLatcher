@@ -109,7 +109,14 @@
     if (status === 401) return "That token was rejected. Paste a new one.";
     if (status === 403) return "This token can't write the repo. Give it Contents: Read and write.";
     if (status === 404) return "Can't see the repo with this token. Enable Contents access for this repository.";
+    if (/does not match/i.test(message || "")) {
+      return "Phone and computer saved at the same time. Try that chat again.";
+    }
     return message || `GitHub error (${status})`;
+  }
+
+  function isShaClash(status, message) {
+    return status === 409 || status === 422 || /does not match/i.test(message || "");
   }
 
   async function readGhJson(res) {
@@ -187,6 +194,11 @@
     if (!token || !github?.owner || !github?.repo) return null;
     const path = encodeURIComponent(github.path || "data/board.json").replace(/%2F/g, "/");
     const url = `https://api.github.com/repos/${github.owner}/${github.repo}/contents/${path}`;
+    let useSha = sha;
+    if (!useSha || (attempt || 0) > 0) {
+      const latest = await pullBoard(github);
+      if (latest && !latest.missing) useSha = latest.sha;
+    }
     const content = toB64(JSON.stringify(payload, null, 2));
     const res = await fetch(url, {
       method: "PUT",
@@ -195,19 +207,18 @@
         message: "Update Latch board",
         content,
         branch: github.branch || "main",
-        sha: sha || undefined
+        sha: useSha || undefined
       })
     });
-    if ((res.status === 409 || res.status === 422) && (attempt || 0) < 1) {
-      const again = await pullBoard(github);
-      if (!again || again.missing) throw new Error("GitHub conflict — try Save again");
-      return pushBoard(github, payload, again.sha, (attempt || 0) + 1);
-    }
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
+      const err = await readGhJson(res).catch(() => ({}));
+      if (isShaClash(res.status, err.message) && (attempt || 0) < 5) {
+        await new Promise((r) => setTimeout(r, 200 + (attempt || 0) * 250));
+        return pushBoard(github, payload, null, (attempt || 0) + 1);
+      }
       throw new Error(friendlyGhError(res.status, err.message));
     }
-    const body = await res.json();
+    const body = await readGhJson(res);
     return body.content?.sha || body.sha;
   }
 

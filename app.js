@@ -159,6 +159,8 @@ async function syncToGithubNow() {
   setGhStatus("Saving…");
   try {
     await latchStorage.offloadPhotos(state, g);
+    const latest = await latchStorage.pullBoard(g);
+    if (latest && latest.sha) g.sha = latest.sha;
     const sha = await latchStorage.pushBoard(g, boardPayload(), g.sha);
     if (sha) state.github.sha = sha;
     latchStorage.writeLocal(state);
