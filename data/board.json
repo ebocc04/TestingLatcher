@@ -74,9 +74,28 @@
   "unread": {
     "nina": false
   },
-  "tweaks": {},
+  "tweaks": {
+    "nina": {
+      "name": "",
+      "age": "",
+      "city": "",
+      "job": "",
+      "gender": "",
+      "orientation": "straight",
+      "intention": "",
+      "style": {
+        "tone": "",
+        "flirt": 1,
+        "emojiRate": 0.15,
+        "bang": 0.25,
+        "lower": false,
+        "clip": false,
+        "pace": ""
+      }
+    }
+  },
   "unmatched": [],
-  "updatedAt": 1787363944695,
+  "updatedAt": 1787363970081,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
