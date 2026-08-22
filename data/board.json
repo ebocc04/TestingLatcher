@@ -34,8 +34,8 @@
     ]
   },
   "onboarded": true,
-  "view": "chat",
-  "chatId": "sasha",
+  "view": "profile",
+  "chatId": null,
   "skipped": [
     "hana"
   ],
@@ -105,6 +105,21 @@
         "from": "me",
         "text": "You not asking to makeout right now",
         "ts": 1787365365931
+      },
+      {
+        "from": "them",
+        "text": "Okay, noted!",
+        "ts": 1787365367851
+      },
+      {
+        "from": "me",
+        "text": "We gonna fix that or….",
+        "ts": 1787365384036
+      },
+      {
+        "from": "them",
+        "text": "Fair.",
+        "ts": 1787365386198
       }
     ]
   },
@@ -152,7 +167,7 @@
   "unmatched": [
     "nina"
   ],
-  "updatedAt": 1787365366836,
+  "updatedAt": 1787368981362,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
