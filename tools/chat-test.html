@@ -22,6 +22,21 @@
 
     const SCENARIOS = [
       {
+        /* Replay of a real thread that read like a bot: every reply that used to be a
+           non-sequitur is marked below. Nina was overridden to straight at the time. */
+        who: "nina",
+        label: "replay of the bad Nina thread",
+        override: { orientation: "straight" },
+        opener: "Hi hi. If we match I'm legally required to ask your pastry allegiance.",
+        says: [
+          "My pastry allegiance?",
+          "lol what?",
+          "Please tell me you're into women",
+          "Girls 99.99% of the time",
+          "You telling me you never tried?"
+        ]
+      },
+      {
         who: "nina",
         label: "the dialog that went wrong",
         opener: "Croissant or cookie. This matters.",
@@ -63,7 +78,8 @@
 
     for (const sc of SCENARIOS) {
       if (only && sc.who !== only) continue;
-      const p = window.LATCH_PROFILES.find((x) => x.id === sc.who);
+      const base = window.LATCH_PROFILES.find((x) => x.id === sc.who);
+      const p = sc.override ? { ...base, ...sc.override } : base;
       const thread = [];
       out.push(`=== ${p.name} (${p.orientation}, ${p.gender}) — ${sc.label} ===`);
       if (sc.opener) {

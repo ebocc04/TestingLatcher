@@ -130,7 +130,11 @@
        need opposite answers, so they're matched separately. */
     nudgeAsk: /^(so |well |and )?(are|do|did|is|have|can|would|will)\s+(you|u)\s*\??$/i,
     nudge: /^(and )?(you|u|hbu|wbu|yourself|so|well|and|but)\s*\??$|^\?+$/i,
-    eitherOr: /\b([a-z]{3,})\s+or\s+([a-z]{3,})\b/i
+    eitherOr: /\b([a-z]{3,})\s+or\s+([a-z]{3,})\b/i,
+    /* "lol what?" is not a question about me, it's a request to explain myself. */
+    confused: /^(lol |lmao |haha |wait |uh |um |huh )*(what|huh|wdym|what do you mean|come again|you what|sorry)[?.!]*$/i,
+    yesNo: /^(do|did|does|are|is|was|were|have|has|had|can|could|would|will|should|you telling me|dont you|don'?t you|didn'?t you|aren'?t you)\b/i,
+    neverTried: /\bnever\s+(tried|been|had|done|seen)\b|\bnever tried\b/i
   };
 
   /* A question, however it's punctuated. Order matters: first match wins. */
@@ -310,6 +314,7 @@
     const t = String(text || "").trim();
     if (RE.bye.test(t)) return "bye";
     if (RE.sexual.test(t)) return "sexual";
+    if (RE.confused.test(t)) return "confused";
     /* A nudge means: answer the thing I already asked you. */
     if (RE.nudgeAsk.test(t)) return ctx.pendingAsk ? "pending" : "reaffirm";
     if (RE.nudge.test(t) && ctx.pendingAsk) return "pending";
@@ -353,6 +358,8 @@
     }
     if (target) {
       const mine = [...set][0];
+      /* Asking "and you?" straight after turning someone down is not a good look. */
+      ctx.turnedDown = true;
       return choose(
         [`I'm ${label}, so ${mine} — sorry to be the one to say it.`, `${label[0].toUpperCase()}${label.slice(1)}, so it's ${mine} for me.`],
         ctx,
@@ -473,12 +480,60 @@
     return byTopic ? byTopic[1] : SELF[topic] || "";
   }
 
-  /* Volunteer something instead of complimenting their message. Real people trade
-     information; bots hand out gold stars. */
+  /* Volunteer something when they've asked me to share — "you?", "hbu". Prompt answers
+     are deliberately excluded: pasted out of context they read like a brochure, which
+     is how a bot gives itself away. */
   function disclose(p, ctx) {
     const topical = ctx.anyTopic && SELF[ctx.anyTopic];
-    const prompts = (p.prompts || []).map((x) => x.a);
-    return choose([topical, ...prompts], ctx, "disclose");
+    return (
+      topical ||
+      choose([`Quiet week, honestly. Work, gym, too much of my phone.`, `Not much — which is why this is the best part of my night.`], ctx, "disclose")
+    );
+  }
+
+  /* They asked something I can't parse. Answer like a person: commit to something
+     light, or admit I need more. Anything is better than reciting a fact about myself. */
+  function genericAnswer(p, ctx, text) {
+    if (RE.neverTried.test(text)) {
+      return choose([`Never properly. You offering to teach me?`, `Nope. Judge me, it's fine.`], ctx, "never");
+    }
+    if (RE.yesNo.test(String(text).trim())) {
+      return choose(
+        [`Depends on the day, honestly.`, `Ha — yes. I'm not that mysterious.`, `Not really, no. Should I be?`],
+        ctx,
+        "yesno"
+      );
+    }
+    return choose([`Say more — I want to answer that properly.`, `That's a bigger question than you meant it to be.`], ctx, "vague");
+  }
+
+  /* "lol what?" — explain myself instead of changing the subject. */
+  function clarify(p, ctx) {
+    if (ctx.eitherOr) {
+      return `The ${ctx.eitherOr[1]} or ${ctx.eitherOr[2]} thing. Pick one, it's a real question.`;
+    }
+    if (ctx.anyTopic) return `The ${ctx.anyTopic} thing. I stand by it, but I hear myself.`;
+    return choose([`Ignore me, I'm being weird. How's your night going?`, `That made more sense in my head. Moving on.`], ctx, "clarify");
+  }
+
+  /* They answered my question and there's no fact or topic to grab — respond to how
+     they said it. Numbers, absolutes and hedges are all worth a comment. */
+  function reactToShape(ctx, text) {
+    const pct = /(\d{1,3}(?:\.\d+)?)\s?%/.exec(text);
+    if (pct) {
+      const n = Number(pct[1]);
+      if (n > 0 && n < 100) {
+        const rest = Math.round((100 - n) * 100) / 100;
+        return `That ${rest}% is doing a lot of work in that sentence.`;
+      }
+      return `${pct[0]}. No notes, that's commitment.`;
+    }
+    if (/\b(always|never|every time|100)\b/i.test(text)) return choose([`Absolutes. Bold of you.`, `No hedging at all. I respect it.`], ctx, "abs");
+    if (/\b(mostly|kinda|kind of|sometimes|i guess|usually|depends)\b/i.test(text)) {
+      return choose([`That's a diplomatic way to put it.`, `"Mostly." Okay, I'll allow it.`], ctx, "hedge");
+    }
+    if (genderIn(text)) return choose([`Noted, and good — that was the actual question.`, `Right answer.`], ctx, "gender-ack");
+    return "";
   }
 
   const FOLLOW_UP = {
@@ -587,7 +642,7 @@
     if (kind === "job" && !ctx.facts.job) return `What about you — what do you do all day?`;
     if (kind === "city" && !ctx.facts.city) return `Whereabouts are you?`;
     if (kind === "intention") return `What are you looking for? Same honesty rules.`;
-    if (kind === "orientation" || kind === "type") return `You?`;
+    if (kind === "orientation" || kind === "type") return ctx.turnedDown ? "" : `You?`;
     if (kind === "howAreYou") return `And you? Real answer, not "good."`;
     return "";
   }
@@ -691,14 +746,18 @@
       return out;
     }
     if (intent === "reaffirm") {
-      push(reaffirm(p, ctx) || answerFor(p, ctx.lastAskKind, ctx, text) || disclose(p, ctx));
+      push(reaffirm(p, ctx) || answerFor(p, ctx.lastAskKind, ctx, text) || genericAnswer(p, ctx, text));
+      return out;
+    }
+    if (intent === "confused") {
+      push(clarify(p, ctx));
       return out;
     }
     if (intent === "asked") {
       const kind = askedWhat(text);
       const flirty = RE.flirt.test(text) || RE.tease.test(text);
       if (flirty && kind) push(flirtBack(p, ctx));
-      push(answerFor(p, kind, ctx, text) || keywordAnswer(p, text) || disclose(p, ctx));
+      push(answerFor(p, kind, ctx, text) || keywordAnswer(p, text) || genericAnswer(p, ctx, text));
       if (canAsk && !/\?$/.test(out[out.length - 1] || "")) push(reciprocal(kind, ctx) || (roll(ctx, "bounce", 0.5) ? followUp(p, ctx) : ""));
       return out;
     }
@@ -767,8 +826,10 @@
        ask something or offer something of my own. Never praise the message itself. */
     if (intent === "answered" && ctx.eitherOr) push(pickedSide(ctx, text));
     push(reactToStatement(p, ctx, text));
+    if (!out.length && intent === "answered") push(reactToShape(ctx, text));
     if (!out.length) push(keywordAnswer(p, text));
-    if (!out.length) push(canAsk ? followUp(p, ctx) : disclose(p, ctx));
+    /* Last resort is a short human beat, not a fact about myself nobody asked for. */
+    if (!out.length) push(canAsk ? followUp(p, ctx) : choose([`Okay, noted.`, `Right.`, `Fair.`], ctx, "beat"));
     else if (canAsk && !ctx.brief && roll(ctx, "tail", 0.6)) push(followUp(p, ctx));
     return out;
   }
