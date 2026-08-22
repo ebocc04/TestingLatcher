@@ -79,6 +79,7 @@ function emptyState() {
     unread: {},
     pendingBots: {},
     tweaks: {},
+    customProfiles: [],
     unmatched: [],
     github: defaultGithub(),
     updatedAt: 0
@@ -94,6 +95,7 @@ function migrate(raw) {
   if (!s.github.owner || !s.github.repo) s.github = { ...latchStorage.inferTarget(), sha: s.github.sha || null };
   s.pendingBots = {};
   s.tweaks = raw.tweaks || {};
+  s.customProfiles = Array.isArray(raw.customProfiles) ? raw.customProfiles : [];
   s.unmatched = raw.unmatched || [];
   if (!s.user.photos.some(Boolean) || !s.user.name) s.onboarded = false;
   return s;
@@ -203,16 +205,20 @@ function applyTweaks(p) {
   });
   if (t.prompts) out.prompts = p.prompts.map((q, i) => (t.prompts[i] ? { ...q, a: t.prompts[i] } : q));
   /* chat.js reads style off the profile, so tone edits reach the reply planner. */
-  if (t.style) out.style = t.style;
+  if (t.style) out.style = { ...(p.style || {}), ...t.style };
   return out;
 }
 
+function roster() {
+  return [...(state.customProfiles || []), ...window.LATCH_PROFILES];
+}
+
 function allProfiles() {
-  return window.LATCH_PROFILES.map(applyTweaks);
+  return roster().map(applyTweaks);
 }
 
 function profileById(id) {
-  const p = window.LATCH_PROFILES.find((x) => x.id === id);
+  const p = roster().find((x) => x.id === id);
   return p ? applyTweaks(p) : null;
 }
 
@@ -833,7 +839,7 @@ function renderProfile() {
       <label class="stack">Height<input class="field" data-f="height" value="${esc(u.height)}" /></label>
       <label class="stack">Dating intention
         <select data-f="intention">
-          ${["Looking for something serious", "Open to whatever", "Figuring it out"]
+          ${["Looking for something serious", "Open to whatever", "Figuring it out", "Here for a good time"]
             .map((opt) => `<option ${u.intention === opt ? "selected" : ""}>${opt}</option>`)
             .join("")}
         </select>
@@ -857,6 +863,7 @@ function renderProfile() {
       <div class="admin-card">
         <h3>Admin</h3>
         <p class="muted">Manual controls. These act on this browser, then sync like everything else.</p>
+        <button class="btn-primary" id="add-profile">Add a profile</button>
         <button class="btn-ghost" id="reset-demo">Reset likes, matches &amp; chats</button>
         <button class="btn-ghost" id="reset-people">Reset customized people${
           Object.keys(state.tweaks || {}).length ? ` (${Object.keys(state.tweaks).length})` : ""
@@ -893,6 +900,7 @@ function renderProfile() {
   bindPhotoInputs(root, renderProfile);
   bindGithub(root);
   bindLlm(root);
+  $("add-profile").onclick = () => openAddProfile();
   $("reset-demo").onclick = () => {
     state.skipped = [];
     state.liked = [];
@@ -954,7 +962,284 @@ function confirmReset(mode) {
   };
 }
 
-function openComment(p, promptIndex) {
+function parseInstagram(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return null;
+  if (/\.(jpe?g|png|webp|gif)(\?|$)/i.test(raw) && !/instagram\.com/i.test(raw)) {
+    return { kind: "image", url: raw };
+  }
+  const href = /^https?:/i.test(raw)
+    ? raw
+    : raw.startsWith("@") || !raw.includes(".")
+      ? `https://www.instagram.com/${raw.replace(/^@/, "")}/`
+      : `https://${raw}`;
+  let u;
+  try {
+    u = new URL(href);
+  } catch (_) {
+    return null;
+  }
+  if (!/(^|\.)instagram\.com$/i.test(u.hostname)) return { kind: "image", url: href };
+  const parts = u.pathname.split("/").filter(Boolean);
+  const head = (parts[0] || "").toLowerCase();
+  if (["p", "reel", "reels", "tv"].includes(head) && parts[1]) {
+    return { kind: "post", handle: "", page: `https://www.instagram.com/p/${parts[1]}/` };
+  }
+  if (parts[0] && !["explore", "accounts", "stories"].includes(head)) {
+    return { kind: "profile", handle: parts[0], page: `https://www.instagram.com/${parts[0]}/` };
+  }
+  return null;
+}
+
+function extractPhotoUrls(html) {
+  const urls = [];
+  const add = (u) => {
+    if (!u) return;
+    const clean = String(u).replace(/\\u0026/g, "&").replace(/\\+/g, "").replace(/&amp;/g, "&");
+    if (/^https?:\/\//i.test(clean) && /\.(jpe?g|png|webp)/i.test(clean.split("?")[0]) && !urls.includes(clean)) {
+      urls.push(clean);
+    }
+  };
+  const og = html.match(/property=["']og:image["'][^>]*content=["']([^"']+)/i) || html.match(/content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+  if (og) add(og[1]);
+  [...html.matchAll(/"display_url"\s*:\s*"([^"]+)"/g)].forEach((m) => add(m[1].replace(/\\u0026/g, "&")));
+  [...html.matchAll(/https?:\\?\/\\?\/[^\s"'\\]+scontent[^\s"'\\]+\.(?:jpe?g|webp)/gi)].forEach((m) =>
+    add(m[0].replace(/\\\//g, "/"))
+  );
+  return urls.slice(0, 6);
+}
+
+async function fetchPageText(url) {
+  const proxies = [
+    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`
+  ];
+  let last = "";
+  for (const wrap of proxies) {
+    try {
+      const res = await fetch(wrap(url));
+      if (!res.ok) {
+        last = `${res.status}`;
+        continue;
+      }
+      const text = await res.text();
+      if (text && text.length > 200) return text;
+      last = "empty page";
+    } catch (err) {
+      last = err.message;
+    }
+  }
+  throw new Error(last || "Couldn't reach Instagram from the browser.");
+}
+
+async function pullInstagramPhotos(input) {
+  const parsed = parseInstagram(input);
+  if (!parsed) throw new Error("Paste an Instagram profile, post, or a photo URL.");
+  if (parsed.kind === "image") {
+    const data = await latchStorage.compressImageUrl(parsed.url);
+    return { handle: "", photos: [data] };
+  }
+  const html = await fetchPageText(parsed.page);
+  const found = extractPhotoUrls(html);
+  const photos = [];
+  for (const src of found) {
+    if (photos.length >= 6) break;
+    try {
+      photos.push(await latchStorage.compressImageUrl(src));
+    } catch (_) {}
+  }
+  if (!photos.length) {
+    throw new Error(
+      "Instagram blocked the grab. Open the profile, copy image addresses, or upload shots below."
+    );
+  }
+  return { handle: parsed.handle || "", photos };
+}
+
+function customVoice(name, explicit) {
+  if (explicit) {
+    return {
+      greet: [`hey. skip the small talk — what do you want.`, `hi. I already like your face.`],
+      reply: [`yeah I'm into that.`, `keep going.`, `come say that in person.`],
+      keywords: {}
+    };
+  }
+  return {
+    greet: [`Hey — just got here.`, `Hi. Your profile didn't feel like homework.`],
+    reply: [`That's a good answer.`, `I like this.`, `Want to keep talking?`],
+    keywords: {}
+  };
+}
+
+function emptyCustom() {
+  return {
+    id: `c-${Date.now().toString(36)}`,
+    custom: true,
+    name: "",
+    age: 26,
+    gender: "women",
+    orientation: "bisexual",
+    city: state.user.city || "Austin",
+    job: "",
+    school: "",
+    height: "",
+    intention: "Open to whatever",
+    standout: false,
+    likesYou: true,
+    likeNote: "",
+    instagram: "",
+    photos: ["", "", "", "", "", ""],
+    prompts: [
+      { q: "I go crazy for", a: "" },
+      { q: "I'm looking for", a: "" },
+      { q: "The way to win me over is", a: "" }
+    ],
+    style: { tone: "direct", flirt: 0.9, explicit: true, lower: true, clip: true, bang: 0.2, emojiRate: 0.1 }
+  };
+}
+
+function addPhotoPreviewHtml(photos) {
+  return `<div class="photo-row six">${[0, 1, 2, 3, 4, 5]
+    .map(
+      (i) => `<div class="photo-slot">
+        ${photos[i] ? `<img src="${esc(photos[i])}" alt="" />` : ""}
+        <label>${photos[i] ? "Change" : "Add"}<input type="file" accept="image/*" data-add-photo="${i}" /></label>
+      </div>`
+    )
+    .join("")}</div>`;
+}
+
+function openAddProfile() {
+  const draft = emptyCustom();
+  const modal = $("modal");
+  const paint = (status) => {
+    modal.classList.remove("hidden");
+    modal.innerHTML = `<div class="sheet sheet-full">
+      <div class="sheet-bar">
+        <button class="btn-ghost" id="cancel-m" aria-label="Close">←</button>
+        <strong>Add a profile</strong>
+      </div>
+      <div class="sheet-scroll admin-form">
+        <p class="muted">Paste an Instagram profile or post. The browser will try to pull public photos. Instagram often blocks that — if it fails, upload shots or paste image URLs.</p>
+        <label>Instagram
+          <input id="add-ig" value="${esc(draft.instagram)}" placeholder="https://instagram.com/name or a post link" />
+        </label>
+        <div class="row" style="justify-content:flex-start;margin:0">
+          <button type="button" class="btn-primary" id="add-grab">Grab photos</button>
+        </div>
+        <p class="muted" id="add-status">${esc(status || "")}</p>
+        <div id="add-photos">${addPhotoPreviewHtml(draft.photos)}</div>
+        <label>Or paste photo URLs (one per line)
+          <textarea id="add-urls" rows="3" placeholder="https://…"></textarea>
+        </label>
+        <label>Name<input id="add-name" value="${esc(draft.name)}" /></label>
+        <div class="two">
+          <label>Age<input id="add-age" type="number" min="18" max="99" value="${esc(draft.age)}" /></label>
+          <label>City<input id="add-city" value="${esc(draft.city)}" /></label>
+        </div>
+        <label>Job<input id="add-job" value="${esc(draft.job)}" /></label>
+        <div class="two">
+          <label>Gender<select id="add-gender">${["women", "men", "nonbinary"]
+            .map((g) => `<option value="${g}" ${draft.gender === g ? "selected" : ""}>${genderLabel(g)}</option>`)
+            .join("")}</select></label>
+          <label>Sexuality<select id="add-orientation">${ORIENTATIONS.map(
+            ([v, l]) => `<option value="${v}" ${draft.orientation === v ? "selected" : ""}>${l}</option>`
+          ).join("")}</select></label>
+        </div>
+        <label class="check"><input id="add-explicit" type="checkbox" ${draft.style.explicit ? "checked" : ""} /> goes along with explicit / sexual chat</label>
+        ${draft.prompts
+          .map((q, i) => `<label>${esc(q.q)}<textarea id="add-prompt-${i}" rows="2">${esc(q.a)}</textarea></label>`)
+          .join("")}
+      </div>
+      <div class="sheet-foot">
+        <button class="btn-ghost" id="cancel-add">Cancel</button>
+        <button class="btn-primary" id="add-save">Add to the deck</button>
+      </div>
+    </div>`;
+    const read = () => {
+      draft.instagram = ($("add-ig") || {}).value || "";
+      draft.name = ($("add-name") || {}).value || "";
+      draft.age = Number(($("add-age") || {}).value || 26);
+      draft.city = ($("add-city") || {}).value || draft.city;
+      draft.job = ($("add-job") || {}).value || "";
+      draft.gender = ($("add-gender") || {}).value || "women";
+      draft.orientation = ($("add-orientation") || {}).value || "bisexual";
+      draft.style.explicit = Boolean($("add-explicit") && $("add-explicit").checked);
+      draft.style.flirt = draft.style.explicit ? 0.95 : 0.55;
+      draft.prompts.forEach((q, i) => {
+        q.a = ($(`add-prompt-${i}`) || {}).value || "";
+      });
+    };
+    $("cancel-m").onclick = closeModal;
+    $("cancel-add").onclick = closeModal;
+    modal.onclick = (e) => {
+      if (e.target === modal) closeModal();
+    };
+    modal.querySelectorAll("[data-add-photo]").forEach((el) => {
+      el.onchange = async () => {
+        if (!el.files[0]) return;
+        try {
+          draft.photos[Number(el.dataset.addPhoto)] = await latchStorage.compressImage(el.files[0], 560, 0.62);
+          read();
+          paint("Photo added.");
+        } catch (_) {
+          toast("Couldn't read that photo");
+        }
+      };
+    });
+    $("add-grab").onclick = async () => {
+      read();
+      const status = $("add-status");
+      status.textContent = "Pulling photos…";
+      try {
+        const got = await pullInstagramPhotos(draft.instagram);
+        got.photos.forEach((src, i) => {
+          draft.photos[i] = src;
+        });
+        if (got.handle && !draft.name) draft.name = got.handle.replace(/[._]/g, " ");
+        paint(`Got ${got.photos.length} photo${got.photos.length === 1 ? "" : "s"}.`);
+      } catch (err) {
+        status.textContent = err.message;
+        toast(err.message);
+      }
+    };
+    $("add-save").onclick = async () => {
+      read();
+      const extra = (($("add-urls") || {}).value || "")
+        .split(/\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const src of extra) {
+        const slot = draft.photos.findIndex((x) => !x);
+        if (slot < 0) break;
+        try {
+          draft.photos[slot] = await latchStorage.compressImageUrl(src);
+        } catch (_) {
+          toast(`Couldn't load ${src.slice(0, 32)}…`);
+        }
+      }
+      draft.photos = draft.photos.filter(Boolean).slice(0, 6);
+      if (!draft.photos.length) {
+        toast("Need at least one photo");
+        return;
+      }
+      if (!draft.name.trim()) {
+        toast("Give them a name");
+        return;
+      }
+      draft.voice = customVoice(draft.name, draft.style.explicit);
+      draft.likeNote = draft.style.explicit
+        ? "already thinking about you. match me."
+        : "Liked your profile.";
+      state.customProfiles = [draft, ...(state.customProfiles || [])];
+      closeModal();
+      save();
+      toast(`${draft.name} is in Discover`);
+      setView("discover");
+    };
+  };
+  paint("");
+}
   const prompt = p.prompts[promptIndex];
   const modal = $("modal");
   modal.classList.remove("hidden");
@@ -1092,6 +1377,7 @@ function readPersonAdmin(base) {
       bang: Number(($("a-bang") || {}).value || 25) / 100,
       lower: Boolean($("a-lower") && $("a-lower").checked),
       clip: Boolean($("a-clip") && $("a-clip").checked),
+      explicit: Boolean($("a-explicit") && $("a-explicit").checked),
       pace: val("a-pace")
     }
   };
@@ -1105,7 +1391,7 @@ function persistPersonAdmin(base, opts = {}) {
 }
 
 function openPersonAdmin(p) {
-  const live = applyTweaks(window.LATCH_PROFILES.find((x) => x.id === p.id) || p);
+  const live = applyTweaks(roster().find((x) => x.id === p.id) || p);
   const style = live.style || {};
   const modal = $("modal");
   modal.classList.remove("hidden");
@@ -1142,6 +1428,7 @@ function openPersonAdmin(p) {
         <input id="a-emoji" type="range" min="0" max="100" value="${Math.round((style.emojiRate ?? 0.15) * 100)}" /></label>
       <label>Exclamation marks <span class="muted">${Math.round((style.bang ?? 0.25) * 100)}%</span>
         <input id="a-bang" type="range" min="0" max="100" value="${Math.round((style.bang ?? 0.25) * 100)}" /></label>
+      <label class="check"><input id="a-explicit" type="checkbox" ${style.explicit ? "checked" : ""} /> goes along with explicit / sexual chat</label>
       <label class="check"><input id="a-lower" type="checkbox" ${style.lower ? "checked" : ""} /> types in lowercase</label>
       <label class="check"><input id="a-clip" type="checkbox" ${style.clip ? "checked" : ""} /> keeps replies short</label>
       <label>Reply speed<select id="a-pace">${[
@@ -1158,7 +1445,7 @@ function openPersonAdmin(p) {
         .join("")}
     </div>
     <div class="sheet-foot">
-      <button class="btn-ghost" id="a-reset">Reset to original</button>
+      <button class="btn-ghost ${live.custom ? "danger" : ""}" id="a-reset">${live.custom ? "Delete this profile" : "Reset to original"}</button>
       <button class="btn-primary" id="a-done">Done</button>
     </div>
   </div>`;
@@ -1182,6 +1469,18 @@ function openPersonAdmin(p) {
     });
   });
   $("a-reset").onclick = () => {
+    if (live.custom) {
+      state.customProfiles = (state.customProfiles || []).filter((x) => x.id !== p.id);
+      delete state.tweaks[p.id];
+      state.matches = state.matches.filter((x) => x !== p.id);
+      state.liked = state.liked.filter((x) => x !== p.id);
+      delete state.threads[p.id];
+      closeModal();
+      save();
+      toast(`${p.name} removed`);
+      setView("discover");
+      return;
+    }
     delete state.tweaks[p.id];
     save();
     closeModal();
@@ -1411,7 +1710,7 @@ function renderOnboard() {
       <label class="stack">Height<input class="field" data-f="height" value="${esc(u.height)}" /></label>
       <label class="stack">Dating intention
         <select data-f="intention">
-          ${["Looking for something serious", "Open to whatever", "Figuring it out"]
+          ${["Looking for something serious", "Open to whatever", "Figuring it out", "Here for a good time"]
             .map((opt) => `<option ${u.intention === opt ? "selected" : ""}>${opt}</option>`)
             .join("")}
         </select>

@@ -588,6 +588,44 @@ window.LATCH_PROFILES = [
         travel: "I plan just enough and leave holes on purpose."
       }
     }
+  },
+  {
+    id: "ivy",
+    name: "Ivy",
+    age: 26,
+    gender: "women",
+    orientation: "bisexual",
+    city: "Austin",
+    job: "Bartender",
+    school: "Dropped out, on purpose",
+    height: "5'7\"",
+    intention: "Here for a good time",
+    standout: true,
+    likesYou: true,
+    likeNote: "Your face. And I don't need three dates to say I want to sleep with you.",
+    photos: pexels([5262276, 5262277, 5262278]),
+    style: { tone: "direct", flirt: 0.95, explicit: true, lower: true, clip: true, bang: 0.15, emojiRate: 0.08 },
+    prompts: [
+      { q: "Let's make sure we're on the same page about", a: "Sex is on the table. I'm not here to be talked into it, and I don't do the slow-down lecture." },
+      { q: "I go crazy for", a: "Someone who can talk dirty and still be normal about coffee the next morning." },
+      { q: "I'm looking for", a: "Chemistry. If you can flirt in a paragraph I'll meet you tonight." }
+    ],
+    voice: {
+      greet: ["hey. skip the how was your day — what do you actually want.", "hi. I already decided I want you. catch up."],
+      reply: [
+        "yeah I'm into that.",
+        "keep going.",
+        "come say that in person.",
+        "good. I was hoping you'd go there."
+      ],
+      keywords: {
+        drink: "I get off late. come sit at the bar and be obvious about it.",
+        sex: "yes. tell me what you want, don't make it a riddle.",
+        hookup: "I'm down. your place or mine, I'm not precious about it.",
+        tonight: "tonight works. text me an address.",
+        coffee: "coffee after. I'm not disappearing."
+      }
+    }
   }
 ];
 
@@ -615,5 +653,7 @@ window.PROMPT_BANK = [
   "Dating me is like",
   "The hallmark of a good relationship is",
   "Worst idea I've ever had",
-  "I'm weirdly attracted to"
+  "I'm weirdly attracted to",
+  "In bed I",
+  "Don't match me if you"
 ];

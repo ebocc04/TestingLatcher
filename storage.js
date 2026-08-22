@@ -42,6 +42,25 @@
     });
   }
 
+  async function compressImageUrl(src, max = 560, quality = 0.62) {
+    const blob = await fetchImageBlob(src);
+    const file = new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" });
+    return compressImage(file, max, quality);
+  }
+
+  async function fetchImageBlob(src) {
+    const tryFetch = async (url) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.blob();
+    };
+    try {
+      return await tryFetch(src);
+    } catch (_) {
+      return tryFetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(src)}`);
+    }
+  }
+
   function getToken() {
     return localStorage.getItem(TOKEN_KEY) || "";
   }
@@ -177,6 +196,7 @@
     STATE_KEY,
     TOKEN_KEY,
     compressImage,
+    compressImageUrl,
     inferTarget,
     connect,
     getToken,

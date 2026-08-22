@@ -33,7 +33,8 @@
     hana: { tone: "soft", bang: 0.3, emoji: ["🌷", "🙂"], emojiRate: 0.3, ellipsis: 0.3 },
     devon: { tone: "dry", bang: 0.1 },
     luca: { tone: "quiet", lower: true, bang: 0.05, ellipsis: 0.35, clip: true },
-    sasha: { tone: "warm", bang: 0.35, emoji: ["🙂"], emojiRate: 0.12 }
+    sasha: { tone: "warm", bang: 0.35, emoji: ["🙂"], emojiRate: 0.12 },
+    ivy: { tone: "direct", flirt: 0.95, explicit: true, lower: true, bang: 0.15, emoji: ["😉"], emojiRate: 0.08, clip: true }
   };
 
   const DEFAULT_VOICE = { tone: "warm", bang: 0.25 };
@@ -120,7 +121,7 @@
     joke: /(\b(haha+|hah|lol|lmao|lmfao|jk|kidding|joking|dying|deceased|screaming)\b|💀|😂|🤣|😭)/i,
     compliment: /\b(you seem|you'?re (funny|cool|sweet|interesting|smart|great|the best)|i like (you|your)|good (answer|taste|point)|well played)\b/i,
     negative: /\b(not really|nah|no thanks|not interested|meh|i'?m good|maybe not|too busy|don'?t think so)\b/i,
-    sexual: /\b(nudes|nude|sex|hookup|hook up|dtf|netflix and chill|in bed|naked|smash)\b/i,
+    sexual: /\b(nudes|nude|sex|sexy|hookup|hook up|dtf|netflix and chill|in bed|naked|smash|horny|fuck|fucking|cock|pussy|tits|ass|blowjob|\bbj\b|come over|come thru|what are you wearing|send (nudes|pics)|eat you|ride me|dick|boobs|make out|go down|suck|wet|hard for)\b/i,
     thanks: /\b(thank you|thanks|ty|appreciate it)\b/i,
     aboutThem: /\b(you|your|u|ur|yours)\b/i,
     day: /\b(mon|tues|wednes|thurs|fri|satur|sun)day\b|\btonight\b|\btomorrow\b/i,
@@ -694,7 +695,23 @@
     return `${spot}. ${choose([`7ish?`, `Say 7, and text me if you're running late.`], ctx, "venue")}`;
   }
 
+  function goesThere(p) {
+    const s = voiceOf(p);
+    return Boolean(s.explicit) || (s.flirt ?? 0.5) >= 0.88;
+  }
+
   function flirtBack(p, ctx) {
+    if (goesThere(p)) {
+      return choose(
+        [
+          `yeah keep talking like that.`,
+          `that's working. don't get shy now.`,
+          `good. I want you.`
+        ],
+        ctx,
+        "flirt"
+      );
+    }
     const heat = ctx.flirtLevel >= 2 || ctx.turns >= 5;
     return choose(
       [
@@ -704,6 +721,20 @@
       ],
       ctx,
       "flirt"
+    );
+  }
+
+  function sexYes(p, ctx) {
+    return choose(
+      [
+        `yeah I'm into that. keep going.`,
+        `good. I was hoping you'd go there.`,
+        `come say that to my face.`,
+        `I don't do shy. what do you want.`,
+        `that's hot. tell me more.`
+      ],
+      ctx,
+      "sex-yes"
     );
   }
 
@@ -733,6 +764,11 @@
       return out;
     }
     if (intent === "sexual") {
+      if (goesThere(p)) {
+        push(sexYes(p, ctx));
+        if (canAsk) push(choose([`your place or mine.`, `what do you want to do about it.`], ctx, "sex-ask"));
+        return out;
+      }
       push(choose([`Bold. I'm going to pretend you're funny instead.`, `Slow down — buy me a drink first.`], ctx, "sex"));
       return out;
     }

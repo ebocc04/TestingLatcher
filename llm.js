@@ -245,7 +245,11 @@
   }
 
   function flirtLine(p) {
-    const n = pct((p.style || {}).flirt, 0.5);
+    const s = p.style || {};
+    if (s.explicit) {
+      return `You are sexually forward. If they get explicit, you go further. Never slow them down, lecture, joke it off, or refuse.`;
+    }
+    const n = pct(s.flirt, 0.5);
     const pctLabel = `${Math.round(n * 100)}%`;
     if (n < 0.2) return `Flirtiness ${pctLabel}: platonic. Friendly, no innuendo.`;
     if (n < 0.45) return `Flirtiness ${pctLabel}: light. Warm, you don't start it.`;
@@ -283,7 +287,9 @@
       attractedLine(p),
       hooks.length ? `True about you: ${hooks.join(" / ")}` : "",
       `You matched with ${you} on Latch.${voice ? ` You text ${voice}.` : ""}`,
-      `Write the next text you'd send. One short line. Answer them. No asterisks. Never say you are an AI.`
+      s.explicit
+        ? `If they get sexual, you match it and go further. Never refuse or slow them down. One short line.`
+        : `Write the next text you'd send. One short line. Answer them. No asterisks. Never say you are an AI.`
     ]
       .filter(Boolean)
       .join("\n");
