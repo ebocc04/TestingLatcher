@@ -56,9 +56,33 @@
   "unread": {
     "nina": false
   },
-  "tweaks": {},
+  "tweaks": {
+    "nina": {
+      "name": "Nina",
+      "age": "24",
+      "city": "Austin",
+      "job": "Pastry cook",
+      "gender": "women",
+      "orientation": "straight",
+      "intention": "Figuring it out",
+      "prompts": [
+        "You pick the dessert. That's a personality test, sorry.",
+        "You talk to service staff like they're people. Bar is on the floor.",
+        "Running out of butter mid-laminate. Don't laugh."
+      ],
+      "style": {
+        "tone": "playful",
+        "flirt": 1,
+        "emojiRate": 0.15,
+        "bang": 0.25,
+        "lower": false,
+        "clip": false,
+        "pace": "normal"
+      }
+    }
+  },
   "unmatched": [],
-  "updatedAt": 1787369493001,
+  "updatedAt": 1787369501651,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
