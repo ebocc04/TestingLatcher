@@ -265,8 +265,12 @@
     },
     "askedAt": 1787375531532
   },
-  "brainReply": null,
-  "updatedAt": 1787375704827,
+  "brainReply": {
+    "id": "b-mt3x8qoc",
+    "status": "loading",
+    "text": "Hermes host is writing…"
+  },
+  "updatedAt": 1787375742437,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
