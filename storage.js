@@ -110,14 +110,35 @@
     return message || `GitHub error (${status})`;
   }
 
+  async function readGhJson(res) {
+    const text = await res.text();
+    if (!String(text || "").trim()) {
+      throw new Error(res.ok ? "GitHub sent an empty reply. Try Connect again." : friendlyGhError(res.status));
+    }
+    try {
+      return JSON.parse(text);
+    } catch (_) {
+      throw new Error(friendlyGhError(res.status, "GitHub reply was not JSON."));
+    }
+  }
+
+  async function blobContent(github, sha, token) {
+    const res = await fetch(`https://api.github.com/repos/${github.owner}/${github.repo}/git/blobs/${sha}`, {
+      headers: ghHeaders(token)
+    });
+    if (!res.ok) throw new Error(friendlyGhError(res.status, (await readGhJson(res).catch(() => ({}))).message));
+    const blob = await readGhJson(res);
+    return blob.content || "";
+  }
+
   async function connect(token) {
     const clean = String(token || "").trim();
     if (!clean) throw new Error("Paste a token first");
     setToken(clean);
     const target = inferTarget();
     const who = await fetch("https://api.github.com/user", { headers: ghHeaders(clean) });
-    if (!who.ok) throw new Error(friendlyGhError(who.status, (await who.json().catch(() => ({}))).message));
-    const user = await who.json();
+    if (!who.ok) throw new Error(friendlyGhError(who.status, (await readGhJson(who).catch(() => ({}))).message));
+    const user = await readGhJson(who);
     let repoRes = await fetch(`https://api.github.com/repos/${target.owner}/${target.repo}`, {
       headers: ghHeaders(clean)
     });
@@ -127,7 +148,7 @@
         headers: ghHeaders(clean)
       });
     }
-    if (!repoRes.ok) throw new Error(friendlyGhError(repoRes.status, (await repoRes.json().catch(() => ({}))).message));
+    if (!repoRes.ok) throw new Error(friendlyGhError(repoRes.status, (await readGhJson(repoRes).catch(() => ({}))).message));
     const board = await pullBoard(target);
     return { login: user.login, target, board };
   }
@@ -140,11 +161,22 @@
     const res = await fetch(url, { headers: ghHeaders(token) });
     if (res.status === 404) return { missing: true, sha: null, data: null };
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
+      const err = await readGhJson(res).catch(() => ({}));
       throw new Error(friendlyGhError(res.status, err.message));
     }
-    const body = await res.json();
-    const data = JSON.parse(fromB64(body.content));
+    const body = await readGhJson(res);
+    let encoded = body.content || "";
+    /* Files over ~1MB come back with a sha and no content. Blobs API still has the file. */
+    if (!encoded.trim() && body.sha) encoded = await blobContent(github, body.sha, token);
+    if (!encoded.trim()) {
+      throw new Error("The saved board is too big for GitHub to send (photos). Connect still works after a smaller save.");
+    }
+    let data;
+    try {
+      data = JSON.parse(fromB64(encoded));
+    } catch (_) {
+      throw new Error("Couldn't read the saved board. Photos probably bloated it — save fewer shots and Connect again.");
+    }
     return { missing: false, sha: body.sha, data };
   }
 
