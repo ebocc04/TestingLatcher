@@ -162,7 +162,7 @@
       "city": "Austin",
       "job": "Pastry cook",
       "gender": "women",
-      "orientation": "lesbian",
+      "orientation": "straight",
       "intention": "Figuring it out",
       "prompts": [
         "You pick the dessert. That's a personality test, sorry.",
@@ -181,7 +181,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369759619,
+  "updatedAt": 1787369774438,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
