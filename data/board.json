@@ -77,6 +77,12 @@
         "from": "me",
         "text": "I like that idea, just to confirm… you’re into women right?",
         "ts": 1787369054691
+      },
+      {
+        "from": "them",
+        "text": "Yes, I am. Looking forward to Thursday!",
+        "ts": 1787369057756,
+        "via": "groq"
       }
     ]
   },
@@ -140,7 +146,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369055597,
+  "updatedAt": 1787369058665,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
