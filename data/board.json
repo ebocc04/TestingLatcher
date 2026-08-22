@@ -67,6 +67,12 @@
         "from": "me",
         "text": "I’m doing well! Thank you for asking. How are you?",
         "ts": 1787374588929
+      },
+      {
+        "from": "them",
+        "text": "i'm doing great, thank you! and yourself?",
+        "ts": 1787374592415,
+        "via": "local"
       }
     ]
   },
@@ -257,7 +263,7 @@
     }
   ],
   "unmatched": [],
-  "updatedAt": 1787374589830,
+  "updatedAt": 1787374593318,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
