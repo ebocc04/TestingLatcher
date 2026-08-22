@@ -34,63 +34,14 @@
     ]
   },
   "onboarded": true,
-  "view": "profile",
+  "view": "discover",
   "chatId": null,
   "skipped": [],
-  "liked": [
-    "nina"
-  ],
-  "matches": [
-    "avery"
-  ],
+  "liked": [],
+  "matches": [],
   "roses": 5,
-  "threads": {
-    "avery": [
-      {
-        "from": "them",
-        "text": "Your prompt about bad first dates made me laugh out loud on a bus.",
-        "ts": 1787364533966
-      },
-      {
-        "from": "me",
-        "text": "Oh yeah? Why you wanna try it out?",
-        "ts": 1787364570980
-      },
-      {
-        "from": "them",
-        "text": "Finally, someone who just asks.",
-        "ts": 1787364573160
-      },
-      {
-        "from": "them",
-        "text": "Drink or a walk this week — which night is bad for you?",
-        "ts": 1787364575446
-      },
-      {
-        "from": "me",
-        "text": "Golfing, but everytime we miss we kiss",
-        "ts": 1787364598652
-      },
-      {
-        "from": "them",
-        "text": "Okay, confident. I'm into it.",
-        "ts": 1787364600868
-      },
-      {
-        "from": "me",
-        "text": "Yeah so you want to?",
-        "ts": 1787364614328
-      },
-      {
-        "from": "them",
-        "text": "A 'quick' pottery class. I made a bowl that is also a metaphor. 🙂",
-        "ts": 1787364617178
-      }
-    ]
-  },
-  "unread": {
-    "avery": false
-  },
+  "threads": {},
+  "unread": {},
   "tweaks": {
     "avery": {
       "name": "",
@@ -112,7 +63,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787364620467,
+  "updatedAt": 1787364623916,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
