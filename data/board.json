@@ -80,12 +80,35 @@
         "clip": false,
         "pace": "normal"
       }
+    },
+    "sasha": {
+      "name": "Sasha",
+      "age": "27",
+      "city": "Austin",
+      "job": "Policy analyst",
+      "gender": "women",
+      "orientation": "lesbian",
+      "intention": "Looking for something serious",
+      "prompts": [
+        "Ambition that still leaves room for a Tuesday night on the couch.",
+        "What you do when you're not trying to impress anyone.",
+        "I like dancing in kitchens more than clubs. Age or wisdom? Unclear."
+      ],
+      "style": {
+        "tone": "playful",
+        "flirt": 1,
+        "emojiRate": 0.15,
+        "bang": 0.25,
+        "lower": false,
+        "clip": false,
+        "pace": "normal"
+      }
     }
   },
   "unmatched": [
     "nina"
   ],
-  "updatedAt": 1787370724617,
+  "updatedAt": 1787370737638,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
