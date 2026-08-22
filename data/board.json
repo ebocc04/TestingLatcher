@@ -56,6 +56,12 @@
         "from": "me",
         "text": "Hey beautiful",
         "ts": 1787370741002
+      },
+      {
+        "from": "them",
+        "text": "Your couch is my happy place",
+        "ts": 1787370744426,
+        "via": "local"
       }
     ]
   },
@@ -113,7 +119,7 @@
   "unmatched": [
     "nina"
   ],
-  "updatedAt": 1787370741904,
+  "updatedAt": 1787370745329,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
