@@ -44,64 +44,9 @@
   "roses": 5,
   "threads": {},
   "unread": {},
-  "tweaks": {
-    "avery": {
-      "name": "",
-      "age": "",
-      "city": "",
-      "job": "",
-      "gender": "",
-      "orientation": "straight",
-      "intention": "",
-      "style": {
-        "tone": "",
-        "flirt": 0.5,
-        "emojiRate": 0.15,
-        "bang": 0.25,
-        "lower": false,
-        "clip": false,
-        "pace": ""
-      }
-    },
-    "nina": {
-      "name": "",
-      "age": "",
-      "city": "",
-      "job": "",
-      "gender": "",
-      "orientation": "straight",
-      "intention": "",
-      "style": {
-        "tone": "",
-        "flirt": 0.5,
-        "emojiRate": 0.15,
-        "bang": 0.25,
-        "lower": false,
-        "clip": false,
-        "pace": ""
-      }
-    },
-    "sasha": {
-      "name": "",
-      "age": "",
-      "city": "",
-      "job": "",
-      "gender": "",
-      "orientation": "straight",
-      "intention": "",
-      "style": {
-        "tone": "",
-        "flirt": 1,
-        "emojiRate": 0.15,
-        "bang": 0.25,
-        "lower": false,
-        "clip": false,
-        "pace": ""
-      }
-    }
-  },
+  "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787369480999,
+  "updatedAt": 1787369487639,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
