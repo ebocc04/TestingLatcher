@@ -59,7 +59,27 @@
   "unread": {
     "c-mt3vrbcx": false
   },
-  "tweaks": {},
+  "tweaks": {
+    "c-mt3vrbcx": {
+      "name": "Wor Marijj",
+      "age": "26",
+      "city": "Austin",
+      "job": "",
+      "gender": "women",
+      "orientation": "bisexual",
+      "intention": "Open to whatever",
+      "style": {
+        "tone": "direct",
+        "flirt": 0.95,
+        "emojiRate": 0.1,
+        "bang": 0.2,
+        "lower": false,
+        "clip": false,
+        "explicit": true,
+        "pace": "normal"
+      }
+    }
+  },
   "customProfiles": [
     {
       "id": "c-mt3vrbcx",
@@ -183,7 +203,7 @@
     }
   ],
   "unmatched": [],
-  "updatedAt": 1787373118064,
+  "updatedAt": 1787373139212,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
