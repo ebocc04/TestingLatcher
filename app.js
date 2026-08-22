@@ -1240,6 +1240,8 @@ function openAddProfile() {
   };
   paint("");
 }
+
+function openComment(p, promptIndex) {
   const prompt = p.prompts[promptIndex];
   const modal = $("modal");
   modal.classList.remove("hidden");
