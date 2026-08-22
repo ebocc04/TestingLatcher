@@ -75,6 +75,11 @@
         "from": "them",
         "text": "Okay, confident. I'm into it.",
         "ts": 1787364600868
+      },
+      {
+        "from": "me",
+        "text": "Yeah so you want to?",
+        "ts": 1787364614328
       }
     ]
   },
@@ -102,7 +107,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787364609335,
+  "updatedAt": 1787364615232,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
