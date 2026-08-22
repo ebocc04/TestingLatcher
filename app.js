@@ -208,14 +208,27 @@ function profileById(id) {
   return p ? applyTweaks(p) : null;
 }
 
+/* "Show me" is the filter; sexuality is a profile attribute that seeds it and gets
+   displayed. Filtering on both let you save a combination that matched nobody —
+   a straight woman set to show women emptied the whole app. */
 function visibleProfiles() {
   const me = state.user;
   return allProfiles().filter((p) => {
     if (me.seeking !== "everyone" && p.gender !== me.seeking) return false;
-    if (!openTo(me, p.gender)) return false;
     if (!openTo(p, me.gender)) return false;
     return true;
   });
+}
+
+/* What someone's stated sexuality implies they want to see, used as the default so
+   the two settings don't start out fighting each other. */
+function seekingFor(user) {
+  const o = user.orientation;
+  const g = user.gender;
+  if (o === "straight") return g === "women" ? "men" : g === "men" ? "women" : "everyone";
+  if (o === "lesbian") return "women";
+  if (o === "gay") return g === "women" ? "women" : "men";
+  return "everyone";
 }
 
 function discoverQueue() {
@@ -371,7 +384,23 @@ function renderDiscover() {
   const root = $("view-discover");
   const queue = discoverQueue();
   if (!queue.length) {
-    root.innerHTML = `<div class="empty"><h3>You're caught up</h3><p class="muted">Nobody left in this filter. Change sexuality / Show me in Profile, or reset the deck.</p></div>`;
+    /* Distinguish "seen everyone" from "your filter excludes everyone" — the second
+       one looks identical but needs a fix, not patience. */
+    const anyone = visibleProfiles().length;
+    root.innerHTML = anyone
+      ? `<div class="empty"><h3>You're caught up</h3><p class="muted">You've been through everyone who fits your filter. Reset the deck from Profile → Admin.</p></div>`
+      : `<div class="empty"><h3>Nobody fits your filter</h3>
+          <p class="muted">You're set to show <b>${esc(state.user.seeking)}</b>, and nobody there matches. Widen it and they'll come back.</p>
+          <button class="btn-primary" id="fix-filter">Show me everyone</button>
+        </div>`;
+    if (!anyone) {
+      $("fix-filter").onclick = () => {
+        state.user.seeking = "everyone";
+        save();
+        toast("Showing everyone");
+        render();
+      };
+    }
     return;
   }
   const p = queue[0];
@@ -696,6 +725,7 @@ function renderProfile() {
     state.skipped = [];
     state.liked = [];
     state.matches = [];
+    state.unmatched = [];
     state.threads = {};
     state.unread = {};
     state.pendingBots = {};
@@ -1123,7 +1153,7 @@ function renderOnboard() {
       </div>
       <div class="wiz-nav">${back}${next}</div>`;
   } else if (onboardStep === 5) {
-    body = `<h2>Show me</h2>
+    body = `<h2>Show me</h2><p>Set from your sexuality — change it if that's not right.</p>
       <div class="choice-col">
         ${[
           ["everyone", "Everyone"],
@@ -1181,6 +1211,11 @@ function renderOnboard() {
   el.querySelectorAll("[data-set]").forEach((btn) => {
     btn.onclick = () => {
       state.user[btn.dataset.set] = btn.dataset.v;
+      /* Seed "Show me" from the sexuality just picked, so the next step starts on the
+         answer that matches instead of a combination that finds nobody. */
+      if (btn.dataset.set === "orientation" || btn.dataset.set === "gender") {
+        state.user.seeking = seekingFor(state.user);
+      }
       save({ skipRemote: true });
       renderOnboard();
     };
