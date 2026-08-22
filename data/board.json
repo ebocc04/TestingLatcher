@@ -38,10 +38,27 @@
   "chatId": null,
   "skipped": [],
   "liked": [],
-  "matches": [],
+  "matches": [
+    "c-mt3w9f5j"
+  ],
   "roses": 5,
-  "threads": {},
-  "unread": {},
+  "threads": {
+    "c-mt3w9f5j": [
+      {
+        "from": "them",
+        "text": "already thinking about you. match me.",
+        "ts": 1787375522444
+      },
+      {
+        "from": "me",
+        "text": "Girl you are gorgeous",
+        "ts": 1787375531523
+      }
+    ]
+  },
+  "unread": {
+    "c-mt3w9f5j": false
+  },
   "tweaks": {},
   "customProfiles": [
     {
@@ -226,9 +243,30 @@
     }
   ],
   "unmatched": [],
-  "brainJob": null,
+  "brainJob": {
+    "id": "b-mt3x8qoc",
+    "chatId": "c-mt3w9f5j",
+    "profileId": "c-mt3w9f5j",
+    "thread": [
+      {
+        "from": "them",
+        "text": "already thinking about you. match me."
+      },
+      {
+        "from": "me",
+        "text": "Girl you are gorgeous"
+      }
+    ],
+    "user": {
+      "name": "Skylar",
+      "age": 22,
+      "gender": "women",
+      "orientation": "lesbian"
+    },
+    "askedAt": 1787375531532
+  },
   "brainReply": null,
-  "updatedAt": 1787375617779,
+  "updatedAt": 1787375704827,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
