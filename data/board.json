@@ -34,98 +34,14 @@
     ]
   },
   "onboarded": true,
-  "view": "profile",
+  "view": "discover",
   "chatId": null,
-  "skipped": [
-    "hana"
-  ],
+  "skipped": [],
   "liked": [],
-  "matches": [
-    "sasha"
-  ],
+  "matches": [],
   "roses": 5,
-  "threads": {
-    "sasha": [
-      {
-        "from": "them",
-        "text": "Hi. Your profile didn't feel like a pitch deck. Relief.",
-        "ts": 1787365240641
-      },
-      {
-        "from": "me",
-        "text": "Yeah?",
-        "ts": 1787365244543
-      },
-      {
-        "from": "them",
-        "text": "That's all I get?",
-        "ts": 1787365246786
-      },
-      {
-        "from": "me",
-        "text": "My bad lol, was trying to be flirty. Guess that didn’t work",
-        "ts": 1787365259069
-      },
-      {
-        "from": "them",
-        "text": "I laughed out loud, which is embarrassing in public.",
-        "ts": 1787365262593
-      },
-      {
-        "from": "them",
-        "text": "Policy is slow. Dating shouldn't be a hearing.",
-        "ts": 1787365264985
-      },
-      {
-        "from": "me",
-        "text": "Fair, you’re… into women right?",
-        "ts": 1787365295367
-      },
-      {
-        "from": "them",
-        "text": "Yes. A lesbian, and you're asking the right question!",
-        "ts": 1787365298627
-      },
-      {
-        "from": "me",
-        "text": "lol just had to double check, some chicks on here say lesbian but then tell me their straight",
-        "ts": 1787365318178
-      },
-      {
-        "from": "them",
-        "text": "Okay that got me!",
-        "ts": 1787365342735
-      },
-      {
-        "from": "them",
-        "text": "What's the last thing that genuinely annoyed you? Small and petty preferred.",
-        "ts": 1787365345815
-      },
-      {
-        "from": "me",
-        "text": "You not asking to makeout right now",
-        "ts": 1787365365931
-      },
-      {
-        "from": "them",
-        "text": "Okay, noted!",
-        "ts": 1787365367851
-      },
-      {
-        "from": "me",
-        "text": "We gonna fix that or….",
-        "ts": 1787365384036
-      },
-      {
-        "from": "them",
-        "text": "Fair.",
-        "ts": 1787365386198
-      }
-    ]
-  },
-  "unread": {
-    "sasha": false
-  },
+  "threads": {},
+  "unread": {},
   "tweaks": {
     "avery": {
       "name": "",
@@ -164,10 +80,8 @@
       }
     }
   },
-  "unmatched": [
-    "nina"
-  ],
-  "updatedAt": 1787368981362,
+  "unmatched": [],
+  "updatedAt": 1787368985238,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
