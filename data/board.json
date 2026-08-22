@@ -36,7 +36,9 @@
   "onboarded": true,
   "view": "discover",
   "chatId": null,
-  "skipped": [],
+  "skipped": [
+    "c-mt3wdn3p"
+  ],
   "liked": [],
   "matches": [],
   "roses": 5,
@@ -226,7 +228,7 @@
     }
   ],
   "unmatched": [],
-  "updatedAt": 1787374518229,
+  "updatedAt": 1787374520010,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
