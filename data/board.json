@@ -34,42 +34,14 @@
     ]
   },
   "onboarded": true,
-  "view": "chat",
-  "chatId": "nina",
+  "view": "discover",
+  "chatId": null,
   "skipped": [],
   "liked": [],
-  "matches": [
-    "nina"
-  ],
+  "matches": [],
   "roses": 5,
-  "threads": {
-    "nina": [
-      {
-        "from": "them",
-        "text": "Hi hi. If we match I'm legally required to ask your pastry allegiance.",
-        "ts": 1787370437135
-      },
-      {
-        "from": "me",
-        "text": "Hi gorgeous",
-        "ts": 1787370446868
-      },
-      {
-        "from": "me",
-        "text": "Hi gorgeous",
-        "ts": 1787370707395
-      },
-      {
-        "from": "them",
-        "text": "When's the first chance to grab butter at Ebell?",
-        "ts": 1787370711608,
-        "via": "local"
-      }
-    ]
-  },
-  "unread": {
-    "nina": false
-  },
+  "threads": {},
+  "unread": {},
   "tweaks": {
     "nina": {
       "name": "Nina",
@@ -95,8 +67,10 @@
       }
     }
   },
-  "unmatched": [],
-  "updatedAt": 1787370712511,
+  "unmatched": [
+    "nina"
+  ],
+  "updatedAt": 1787370721025,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
