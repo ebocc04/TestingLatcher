@@ -34,24 +34,17 @@
     ]
   },
   "onboarded": true,
-  "view": "profile",
+  "view": "discover",
   "chatId": null,
-  "skipped": [
-    "maya",
-    "avery",
-    "hana"
-  ],
-  "liked": [
-    "nina",
-    "sasha"
-  ],
+  "skipped": [],
+  "liked": [],
   "matches": [],
   "roses": 5,
   "threads": {},
   "unread": {},
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787364525276,
+  "updatedAt": 1787364528301,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
