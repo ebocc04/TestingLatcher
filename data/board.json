@@ -132,6 +132,12 @@
         "from": "me",
         "text": "Never even thought about it?",
         "ts": 1787369713179
+      },
+      {
+        "from": "them",
+        "text": "I’m straight, so I’m not into women. That’s just who I am.",
+        "ts": 1787369716311,
+        "via": "groq"
       }
     ]
   },
@@ -164,7 +170,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369714084,
+  "updatedAt": 1787369717222,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
