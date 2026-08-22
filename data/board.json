@@ -38,7 +38,8 @@
   "chatId": null,
   "skipped": [
     "maya",
-    "avery"
+    "avery",
+    "hana"
   ],
   "liked": [
     "nina"
@@ -49,7 +50,7 @@
   "unread": {},
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787364509304,
+  "updatedAt": 1787364510905,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
