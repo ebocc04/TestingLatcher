@@ -34,31 +34,14 @@
     ]
   },
   "onboarded": true,
-  "view": "profile",
+  "view": "discover",
   "chatId": null,
   "skipped": [],
   "liked": [],
-  "matches": [
-    "c-mt3vrbcx"
-  ],
+  "matches": [],
   "roses": 5,
-  "threads": {
-    "c-mt3vrbcx": [
-      {
-        "from": "them",
-        "text": "already thinking about you. match me.",
-        "ts": 1787373108163
-      },
-      {
-        "from": "me",
-        "text": "Girl you’re gorgeous",
-        "ts": 1787373117143
-      }
-    ]
-  },
-  "unread": {
-    "c-mt3vrbcx": false
-  },
+  "threads": {},
+  "unread": {},
   "tweaks": {
     "c-mt3vrbcx": {
       "name": "Wor Marijj",
@@ -203,7 +186,7 @@
     }
   ],
   "unmatched": [],
-  "updatedAt": 1787373498404,
+  "updatedAt": 1787373587609,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
