@@ -25,6 +25,18 @@ Photos are compressed to JPEG before save so the Contents API stays under size l
 
 ## Chat
 
+Two engines. With a Groq API key, replies come from a language model that reads the whole conversation; without one, the built-in rule engine handles it.
+
+### Language model (recommended)
+
+Profile → **Chat engine** → paste a [Groq key](https://console.groq.com/keys) → **Connect**. Groq sends CORS headers, so this static site calls the API directly with no server or proxy. The key is stored in `localStorage` only — it never enters app state or `board.json`, so the GitHub sync can't commit it.
+
+The model list is fetched from your account rather than hardcoded, because Groq retires model IDs on a schedule (the Llama chat models were shut down in August 2026). Default is `openai/gpt-oss-20b`.
+
+Each person's system prompt is compiled from their profile *and* their admin overrides, so chat tone, flirtiness, emoji, lowercase and reply length steer the model. `llm.js` returns `null` on a missing key, a failed request or an empty reply, and `app.js` falls back to the rule engine.
+
+### Built-in engine (no key, offline)
+
 `chat.js` plans each reply against the whole thread rather than the last message. Before answering it works out what you've said about yourself, which of its questions you answered, which of *your* questions it still owes an answer to, whether a date is already agreed, and how long your messages are. Rules it holds to: a question always gets a real answer (including "are you?" two messages later), one question per turn at most, nothing said twice in a thread, and no quoting your message back at you.
 
 Voice is a fixed per-person transform — casing, exclamation marks, emoji, reply length — so a match texts consistently.

@@ -589,6 +589,85 @@ function githubFieldsHtml() {
   </div>`;
 }
 
+function llmFieldsHtml() {
+  const cfg = latchLLM.config();
+  const key = latchLLM.getKey();
+  const on = latchLLM.active();
+  const models = llmFieldsHtml.models || (key ? [cfg.model] : []);
+  return `<div class="prompt-card">
+    <p class="q">Chat engine</p>
+    <p class="muted" style="margin:0 0 12px">Paste a <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">Groq API key</a> and matches are written by a real language model that reads the whole conversation. Without one, the built-in reply engine is used. The key stays in this browser and is never saved to your board.</p>
+    <label class="stack">Groq API key
+      <input class="field" type="password" id="llm-key" value="${esc(key)}" placeholder="gsk_…" autocomplete="off" />
+    </label>
+    <label class="stack" style="margin-top:10px">Model
+      <select class="field" id="llm-model">${(models.length ? models : [cfg.model])
+        .map((m) => `<option value="${esc(m)}" ${m === cfg.model ? "selected" : ""}>${esc(m)}</option>`)
+        .join("")}</select>
+    </label>
+    <label class="check" style="margin-top:10px"><input type="checkbox" id="llm-off" ${on || !key ? "" : "checked"} /> use built-in replies instead</label>
+    <p class="muted" data-llm-status style="margin:8px 0 0">${
+      on ? `Live — ${esc(cfg.model)}` : key ? "Off — using built-in replies" : "No key — using built-in replies"
+    }</p>
+    <div class="row" style="justify-content:flex-start;margin-top:12px">
+      <button type="button" class="btn-primary" id="llm-connect">Connect</button>
+      <button type="button" class="btn-ghost" id="llm-test">Test a reply</button>
+    </div>
+  </div>`;
+}
+
+function setLlmStatus(msg) {
+  const el = document.querySelector("[data-llm-status]");
+  if (el) el.textContent = msg;
+}
+
+function bindLlm(root) {
+  const keyEl = root.querySelector("#llm-key");
+  const modelEl = root.querySelector("#llm-model");
+  root.querySelector("#llm-off")?.addEventListener("change", (e) => {
+    latchLLM.setConfig({ enabled: !e.target.checked });
+    setLlmStatus(latchLLM.active() ? `Live — ${latchLLM.config().model}` : "Off — using built-in replies");
+  });
+  modelEl?.addEventListener("change", () => {
+    latchLLM.setConfig({ model: modelEl.value });
+    setLlmStatus(`Live — ${modelEl.value}`);
+  });
+  root.querySelector("#llm-connect")?.addEventListener("click", async () => {
+    latchLLM.setKey(keyEl.value);
+    if (!keyEl.value.trim()) {
+      setLlmStatus("Key cleared — using built-in replies");
+      return;
+    }
+    setLlmStatus("Checking key…");
+    try {
+      const models = await latchLLM.listModels();
+      llmFieldsHtml.models = models;
+      const cfg = latchLLM.config();
+      /* Groq retires model IDs regularly, so keep the saved one only if it still exists. */
+      const model = models.includes(cfg.model) ? cfg.model : models.includes(latchLLM.DEFAULT_MODEL) ? latchLLM.DEFAULT_MODEL : models[0];
+      latchLLM.setConfig({ model, enabled: true });
+      toast(`Chat model connected — ${model}`);
+      renderProfile();
+    } catch (err) {
+      setLlmStatus(err.message);
+    }
+  });
+  root.querySelector("#llm-test")?.addEventListener("click", async () => {
+    const p = profileById(state.matches[0]) || visibleProfiles()[0];
+    if (!p) {
+      setLlmStatus("No people to test with.");
+      return;
+    }
+    setLlmStatus("Asking…");
+    try {
+      const lines = await latchLLM.reply(p, [{ from: "them", text: "hey, what are you up to tonight?" }, { from: "me", text: "not much. what do you do for work?" }], state.user);
+      setLlmStatus(lines ? `${p.name}: ${lines.join(" / ")}` : "Empty reply — try another model.");
+    } catch (err) {
+      setLlmStatus(err.message);
+    }
+  });
+}
+
 async function connectGithub() {
   const tok = document.getElementById("gh-token");
   const token = tok ? tok.value.trim() : "";
@@ -683,6 +762,7 @@ function renderProfile() {
         )
         .join("")}
       ${githubFieldsHtml()}
+      ${llmFieldsHtml()}
       <div class="admin-card">
         <h3>Admin</h3>
         <p class="muted">Manual controls. These act on this browser, then sync like everything else.</p>
@@ -721,6 +801,7 @@ function renderProfile() {
   });
   bindPhotoInputs(root, renderProfile);
   bindGithub(root);
+  bindLlm(root);
   $("reset-demo").onclick = () => {
     state.skipped = [];
     state.liked = [];
@@ -1065,12 +1146,34 @@ function sendUserMessage(id, text) {
   queueBotReply(id, text);
 }
 
-function queueBotReply(id, userText) {
+async function queueBotReply(id, userText) {
   const p = profileById(id);
   const thread = state.threads[id] || [];
-  const { lines } = latchConverse(p, userText, thread, state.user);
+
+  /* Show them typing while the model is thinking, then fall back to the rule engine if
+     there's no key, the request fails, or the reply comes back empty. */
+  state.pendingBots[id] = true;
+  render();
+  let lines = null;
+  if (window.latchLLM && latchLLM.active()) {
+    try {
+      lines = await latchLLM.reply(p, thread, state.user);
+    } catch (err) {
+      lines = null;
+      if (!queueBotReply.warned) {
+        queueBotReply.warned = true;
+        toast(`Chat model unavailable — using built-in replies. ${err.message}`);
+      }
+    }
+  }
+  if (!lines) lines = latchConverse(p, userText, thread, state.user).lines;
+
   const queue = (lines || []).filter(Boolean).slice(0, 3);
-  if (!queue.length) return;
+  if (!queue.length) {
+    state.pendingBots[id] = false;
+    render();
+    return;
+  }
   const pace = { fast: 0.35, normal: 1, slow: 2.2 }[(p.style && p.style.pace) || "normal"] || 1;
   const sendNext = (i) => {
     state.pendingBots[id] = true;
