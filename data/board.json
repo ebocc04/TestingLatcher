@@ -34,19 +34,31 @@
     ]
   },
   "onboarded": true,
-  "view": "discover",
-  "chatId": null,
+  "view": "chat",
+  "chatId": "avery",
   "skipped": [],
   "liked": [
     "nina"
   ],
-  "matches": [],
+  "matches": [
+    "avery"
+  ],
   "roses": 5,
-  "threads": {},
-  "unread": {},
+  "threads": {
+    "avery": [
+      {
+        "from": "them",
+        "text": "Your prompt about bad first dates made me laugh out loud on a bus.",
+        "ts": 1787364533966
+      }
+    ]
+  },
+  "unread": {
+    "avery": false
+  },
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787364532303,
+  "updatedAt": 1787364534869,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
