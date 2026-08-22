@@ -45,6 +45,66 @@
   "tweaks": {},
   "customProfiles": [
     {
+      "id": "c-mt3wdn3p",
+      "custom": true,
+      "name": "Lo3tus",
+      "age": 26,
+      "gender": "women",
+      "orientation": "bisexual",
+      "city": "Austin",
+      "job": "",
+      "school": "",
+      "height": "",
+      "intention": "Open to whatever",
+      "standout": false,
+      "likesYou": true,
+      "likeNote": "already thinking about you. match me.",
+      "instagram": "https://www.instagram.com/lo3tus/",
+      "photos": [
+        "data/photos/c-mt3wdn3p-0.jpg",
+        "data/photos/c-mt3wdn3p-1.jpg",
+        "data/photos/c-mt3wdn3p-2.jpg",
+        "data/photos/c-mt3wdn3p-3.jpg",
+        "data/photos/c-mt3wdn3p-4.jpg",
+        "data/photos/c-mt3wdn3p-5.jpg"
+      ],
+      "prompts": [
+        {
+          "q": "I go crazy for",
+          "a": ""
+        },
+        {
+          "q": "I'm looking for",
+          "a": ""
+        },
+        {
+          "q": "The way to win me over is",
+          "a": ""
+        }
+      ],
+      "style": {
+        "tone": "direct",
+        "flirt": 0.95,
+        "explicit": true,
+        "lower": true,
+        "clip": true,
+        "bang": 0.2,
+        "emojiRate": 0.1
+      },
+      "voice": {
+        "greet": [
+          "hey. skip the small talk — what do you want.",
+          "hi. I already like your face."
+        ],
+        "reply": [
+          "yeah I'm into that.",
+          "keep going.",
+          "come say that in person."
+        ],
+        "keywords": {}
+      }
+    },
+    {
       "id": "c-mt3wd2sh",
       "custom": true,
       "name": "Alexaasoul",
@@ -166,7 +226,7 @@
     }
   ],
   "unmatched": [],
-  "updatedAt": 1787374075198,
+  "updatedAt": 1787374101160,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
@@ -191,7 +251,13 @@
       "data/photos/c-mt3wd2sh-2.jpg": "8c844b642196ce0c03c3eda539b85e0aff07050b",
       "data/photos/c-mt3wd2sh-3.jpg": "d3bb346a2de935587f0862cde1d49c94d99a5002",
       "data/photos/c-mt3wd2sh-4.jpg": "7224b5425ebe37965587775f121c44b41e5e7836",
-      "data/photos/c-mt3wd2sh-5.jpg": "245c61b9adeff4416ba400fd6e5896e89ae6cc82"
+      "data/photos/c-mt3wd2sh-5.jpg": "245c61b9adeff4416ba400fd6e5896e89ae6cc82",
+      "data/photos/c-mt3wdn3p-0.jpg": "b62fee06f8dc0de97c1bd8ac5b5fecfabaf1c2bc",
+      "data/photos/c-mt3wdn3p-1.jpg": "7f29fec076587eace9e91bbc8189a4c9df2eb94e",
+      "data/photos/c-mt3wdn3p-2.jpg": "ac6ea96e3081d3c2df163e91386723f9a7a7c252",
+      "data/photos/c-mt3wdn3p-3.jpg": "e3de92e3f4fb5c75bae54b8ea2dfabbf0318f967",
+      "data/photos/c-mt3wdn3p-4.jpg": "d38deb5deed5f767c2f7b27a7de900407ec9548f",
+      "data/photos/c-mt3wdn3p-5.jpg": "f9cd594706c7ddb8924358489691a0e5b0f94017"
     }
   }
 }
