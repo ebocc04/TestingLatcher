@@ -3,7 +3,7 @@
     "name": "Skylar",
     "age": 22,
     "gender": "women",
-    "orientation": "straight",
+    "orientation": "lesbian",
     "city": "Austin",
     "seeking": "women",
     "job": "",
@@ -34,7 +34,7 @@
     ]
   },
   "onboarded": true,
-  "view": "profile",
+  "view": "discover",
   "chatId": null,
   "skipped": [],
   "liked": [],
@@ -44,7 +44,7 @@
   "unread": {},
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787364480334,
+  "updatedAt": 1787364484772,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
