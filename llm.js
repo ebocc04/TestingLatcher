@@ -313,10 +313,12 @@
       attractedLine(p),
       hooks.length ? `True about you: ${hooks.join(" / ")}` : "",
       `You matched with ${you.line} on Latch. ${you.ban}${voice ? ` You text ${voice}.` : ""}`,
-      `Answer them first. Remember the thread. At most one question. No asterisks. Never say you are an AI.`,
+      `You are this person texting, not an assistant. No asterisks. Never say you are an AI.`,
+      `If they compliment you, flirt back or tease — do not thank them, do not say you appreciate it, do not ask how they are.`,
+      `Banned: "how are you today", "and yourself", "I appreciate the compliment", "it's a pleasure to match".`,
       s.explicit
         ? `If they get sexual, you match it and go further. Never refuse or slow them down. One or two short lines.`
-        : `Write the next text you'd send. One or two short lines.`
+        : `Write the next text. One or two short lines.`
     ]
       .filter(Boolean)
       .join("\n");
@@ -373,9 +375,9 @@
       .map((m) => ({ role: m.from === "me" ? "user" : "assistant", content: m.text }));
     if (isTightDevice()) {
       if (history.length && history[history.length - 1].role === "user") {
-        history[history.length - 1].content += `\n\n(Reply as ${p.name} — one short text, answer that, no helper voice.)`;
+        history[history.length - 1].content += `\n\n(${p.name} texts back. Flirt or answer. No thank-you-and-how-are-you.)`;
       } else {
-        history.push({ role: "user", content: `Reply as ${p.name} in one short text.` });
+        history.push({ role: "user", content: `${p.name} sends the next text.` });
       }
     }
     return [{ role: "system", content: systemPrompt(p, me) }, ...history];
@@ -394,10 +396,21 @@
   const WEIRD =
     /\b(as an ai|language model|i'?d be happy to|i would be happy to|how can i (help|assist)|that'?s a great (question|point|idea)|as \w+ i would say|here('s| is) (a |my )?(reply|response)|sure i can (help|assist|do)|i understand you('re| are)|let me know if you|feel free to (ask|share|tell)|is there anything else|i'?m here to (help|chat|assist)|happy to (help|assist|chat)|as a language)\b/i;
 
+  const RECEPTIONIST =
+    /\b(i appreciate (the |your )?compliment|appreciate the compliment|always a pleasure|pleasure to match|how are you (today|feeling|doing)\b|and yourself\b|you'?re (too )?kind|that'?s so sweet of you|thank you for (asking|the compliment)|hope you('re| are) (having|doing)|it'?s always a pleasure)\b/i;
+
+  function isReceptionist(text) {
+    const t = String(text || "").trim();
+    if (RECEPTIONIST.test(t)) return true;
+    const thanks = /\b(thank you|thanks|i appreciate)\b/i.test(t);
+    const checkin = /\b(how are you|and (you|yourself)\b)/i.test(t);
+    return thanks && checkin;
+  }
+
   function isWeird(text) {
     const t = String(text || "").trim();
     if (!t) return true;
-    if (WEIRD.test(t)) return true;
+    if (WEIRD.test(t) || isReceptionist(t)) return true;
     if (/HARD FACTS|never say you are an AI|Reply as /i.test(t)) return true;
     return t.split(/\s+/).length > 40;
   }
@@ -462,9 +475,9 @@
   function localOpts(phone) {
     return phone
       ? {
-          temperature: 0.7,
-          top_p: 0.88,
-          max_tokens: 64,
+          temperature: 0.85,
+          top_p: 0.9,
+          max_tokens: 72,
           presence_penalty: 0.4,
           frequency_penalty: 0.3,
           stop: ["\nUser:", "\nThem:", "\nHuman:", "User:", "Them:"]
@@ -485,7 +498,7 @@
         { role: "system", content: phonePrompt(p, me) },
         {
           role: "user",
-          content: `${(me && me.name) || "They"} just said: ${last}\nWrite ${p.name}'s next text. One line. Sound like a person, not a chatbot.${hint ? ` Riff on this, don't copy it: ${hint}` : ""}`
+          content: `${(me && me.name) || "They"} just said: ${last}\n${p.name} texts back in one line. No thanks, no how-are-you.${hint ? ` Riff on this, don't copy it: ${hint}` : ""}`
         }
       ],
       ...localOpts(true)
