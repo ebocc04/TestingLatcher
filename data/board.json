@@ -34,8 +34,8 @@
     ]
   },
   "onboarded": true,
-  "view": "chat",
-  "chatId": "avery",
+  "view": "messages",
+  "chatId": null,
   "skipped": [],
   "liked": [
     "nina"
@@ -102,7 +102,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787364601773,
+  "updatedAt": 1787364608188,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
