@@ -37,7 +37,8 @@
   "view": "discover",
   "chatId": null,
   "skipped": [
-    "maya"
+    "maya",
+    "avery"
   ],
   "liked": [
     "nina"
@@ -48,7 +49,7 @@
   "unread": {},
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787364507884,
+  "updatedAt": 1787364509304,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
