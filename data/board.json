@@ -34,46 +34,14 @@
     ]
   },
   "onboarded": true,
-  "view": "chat",
-  "chatId": "nina",
+  "view": "discover",
+  "chatId": null,
   "skipped": [],
   "liked": [],
-  "matches": [
-    "nina"
-  ],
+  "matches": [],
   "roses": 5,
-  "threads": {
-    "nina": [
-      {
-        "from": "them",
-        "text": "Hi hi. If we match I'm legally required to ask your pastry allegiance.",
-        "ts": 1787365164711
-      },
-      {
-        "from": "me",
-        "text": "Oh you are huh? What exactly is “pastry allegiance”?",
-        "ts": 1787365190152
-      },
-      {
-        "from": "them",
-        "text": "Correct answer is always laminated dough. Fight me.",
-        "ts": 1787365193431
-      },
-      {
-        "from": "me",
-        "text": "I’m for love not fighting babe",
-        "ts": 1787365210302
-      },
-      {
-        "from": "them",
-        "text": "Love, not",
-        "ts": 1787365211812
-      }
-    ]
-  },
-  "unread": {
-    "nina": false
-  },
+  "threads": {},
+  "unread": {},
   "tweaks": {
     "avery": {
       "name": "",
@@ -112,8 +80,10 @@
       }
     }
   },
-  "unmatched": [],
-  "updatedAt": 1787365228487,
+  "unmatched": [
+    "nina"
+  ],
+  "updatedAt": 1787365238675,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
