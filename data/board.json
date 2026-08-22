@@ -34,7 +34,7 @@
     ]
   },
   "onboarded": true,
-  "view": "standouts",
+  "view": "likes",
   "chatId": null,
   "skipped": [],
   "liked": [],
@@ -226,7 +226,7 @@
     }
   ],
   "unmatched": [],
-  "updatedAt": 1787374196820,
+  "updatedAt": 1787374198732,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
