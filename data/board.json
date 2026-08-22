@@ -34,7 +34,7 @@
     ]
   },
   "onboarded": true,
-  "view": "standouts",
+  "view": "discover",
   "chatId": null,
   "skipped": [
     "maya"
@@ -48,7 +48,7 @@
   "unread": {},
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787364500553,
+  "updatedAt": 1787364507884,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
