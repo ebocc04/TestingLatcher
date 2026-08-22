@@ -68,6 +68,11 @@
         "from": "them",
         "text": "you talk to service staff like they're people. bar is on the floor.",
         "ts": 1787363943793
+      },
+      {
+        "from": "me",
+        "text": "Please tell me you’re into women",
+        "ts": 1787363978493
       }
     ]
   },
@@ -95,7 +100,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787363970081,
+  "updatedAt": 1787363979401,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
