@@ -121,6 +121,12 @@
         "from": "me",
         "text": "Well let’s see if I can’t expand your taste this Saturday",
         "ts": 1787369700699
+      },
+      {
+        "from": "them",
+        "text": "Sorry, I’m straight so that’s a hard nope.",
+        "ts": 1787369703434,
+        "via": "groq"
       }
     ]
   },
@@ -153,7 +159,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369701607,
+  "updatedAt": 1787369704343,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
