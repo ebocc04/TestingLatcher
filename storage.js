@@ -84,7 +84,8 @@
       repo: "TestingLatcher",
       branch: "main",
       path: "data/board.json",
-      sha: null
+      sha: null,
+      photoShas: {}
     };
     try {
       const host = (location.hostname || "").toLowerCase();
@@ -96,7 +97,8 @@
         repo: seg || `${owner}.github.io`,
         branch: "main",
         path: "data/board.json",
-        sha: null
+        sha: null,
+        photoShas: {}
       };
     } catch (_) {
       return fallback;
@@ -169,13 +171,13 @@
     /* Files over ~1MB come back with a sha and no content. Blobs API still has the file. */
     if (!encoded.trim() && body.sha) encoded = await blobContent(github, body.sha, token);
     if (!encoded.trim()) {
-      throw new Error("The saved board is too big for GitHub to send (photos). Connect still works after a smaller save.");
+      throw new Error("GitHub sent an empty board. Hit Connect again — photos are stored as separate files now.");
     }
     let data;
     try {
       data = JSON.parse(fromB64(encoded));
     } catch (_) {
-      throw new Error("Couldn't read the saved board. Photos probably bloated it — save fewer shots and Connect again.");
+      throw new Error("Couldn't read the saved board. Connect again so photos can move out of board.json.");
     }
     return { missing: false, sha: body.sha, data };
   }
@@ -219,9 +221,198 @@
     }
   }
 
+  const photoCache = new Map();
+  const isDataUrl = (s) => /^data:image\//i.test(s || "");
+  const isIdb = (s) => /^idb:/i.test(s || "");
+  const rawB64 = (dataUrl) => String(dataUrl || "").replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "");
+
+  function openDb() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("latch-photos", 2);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains("photos")) db.createObjectStore("photos");
+        if (!db.objectStoreNames.contains("kv")) db.createObjectStore("kv");
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function idbOp(storeName, mode, fn) {
+    return openDb().then(
+      (db) =>
+        new Promise((resolve, reject) => {
+          const tx = db.transaction(storeName, mode);
+          const req = fn(tx.objectStore(storeName));
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+          tx.oncomplete = () => db.close();
+        })
+    );
+  }
+
+  const photoOp = (mode, fn) => idbOp("photos", mode, fn);
+  const kvOp = (mode, fn) => idbOp("kv", mode, fn);
+
+  async function keepPhoto(dataUrl, hint) {
+    if (!dataUrl) return "";
+    if (!isDataUrl(dataUrl)) return dataUrl;
+    let stored = dataUrl;
+    if (dataUrl.length > 120000) {
+      try {
+        stored = await compressImageUrl(dataUrl, 560, 0.62);
+      } catch (_) {}
+    }
+    const key = String(hint || `p-${Date.now().toString(36)}`).replace(/[^a-z0-9._-]+/gi, "-");
+    await photoOp("readwrite", (store) => store.put(stored, key));
+    const ref = `idb:${key}`;
+    photoCache.set(ref, stored);
+    return ref;
+  }
+
+  function resolvePhoto(src) {
+    if (!src) return "";
+    if (photoCache.has(src)) return photoCache.get(src);
+    if (isIdb(src)) return photoCache.get(src) || "";
+    return src;
+  }
+
+  function walkPhotos(state, visit) {
+    const jobs = [];
+    const each = (arr) => {
+      if (!arr) return;
+      arr.forEach((src, i) => {
+        if (src) jobs.push(Promise.resolve(visit(arr, i, src)));
+      });
+    };
+    each(state.user && state.user.photos);
+    (state.customProfiles || []).forEach((p) => each(p.photos));
+    return Promise.all(jobs);
+  }
+
+  async function hydratePhotos(state) {
+    await walkPhotos(state, async (_arr, _i, src) => {
+      if (!src || photoCache.has(src)) return;
+      const key = isIdb(src) ? src.slice(4) : /^data\/photos\//i.test(src) ? src : "";
+      if (!key) return;
+      const data = await photoOp("readonly", (store) => store.get(key));
+      if (data) photoCache.set(src, data);
+    });
+  }
+
+  async function parkInlinePhotos(state) {
+    await walkPhotos(state, async (arr, i, src) => {
+      if (isDataUrl(src)) arr[i] = await keepPhoto(src, `park-${Date.now().toString(36)}-${i}`);
+    });
+  }
+
+  async function putPhotoFile(github, relPath, dataUrl, attempt) {
+    const token = getToken();
+    const url = `https://api.github.com/repos/${github.owner}/${github.repo}/contents/${relPath}`;
+    github.photoShas = github.photoShas || {};
+    let sha = github.photoShas[relPath];
+    if (!sha) {
+      const ex = await fetch(`${url}?ref=${encodeURIComponent(github.branch || "main")}`, { headers: ghHeaders(token) });
+      if (ex.ok) sha = (await readGhJson(ex)).sha;
+    }
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { ...ghHeaders(token), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `Latch photo ${relPath}`,
+        content: rawB64(dataUrl),
+        branch: github.branch || "main",
+        sha: sha || undefined
+      })
+    });
+    if ((res.status === 409 || res.status === 422) && (attempt || 0) < 1) {
+      const ex = await fetch(`${url}?ref=${encodeURIComponent(github.branch || "main")}`, { headers: ghHeaders(token) });
+      if (ex.ok) github.photoShas[relPath] = (await readGhJson(ex)).sha;
+      else delete github.photoShas[relPath];
+      return putPhotoFile(github, relPath, dataUrl, (attempt || 0) + 1);
+    }
+    if (!res.ok) {
+      const err = await readGhJson(res).catch(() => ({}));
+      throw new Error(friendlyGhError(res.status, err.message));
+    }
+    const body = await readGhJson(res);
+    github.photoShas[relPath] = body.content?.sha || body.sha;
+    photoCache.set(relPath, dataUrl);
+    await photoOp("readwrite", (store) => store.put(dataUrl, relPath));
+    return relPath;
+  }
+
+  async function dataForUpload(src) {
+    if (isDataUrl(src)) return src;
+    if (isIdb(src)) return photoCache.get(src) || (await photoOp("readonly", (store) => store.get(src.slice(4))));
+    return "";
+  }
+
+  async function offloadPhotos(state, github) {
+    if (!getToken() || !github?.owner || !github?.repo) return;
+    const flush = async (arr, prefix) => {
+      if (!arr) return;
+      for (let i = 0; i < arr.length; i += 1) {
+        const src = arr[i];
+        if (!src || (!isDataUrl(src) && !isIdb(src))) continue;
+        const data = await dataForUpload(src);
+        if (!isDataUrl(data)) continue;
+        const id = String(prefix).replace(/[^a-z0-9._-]+/gi, "-") || "pic";
+        arr[i] = await putPhotoFile(github, `data/photos/${id}-${i}.jpg`, data);
+      }
+    };
+    await flush(state.user && state.user.photos, "user");
+    for (const p of state.customProfiles || []) await flush(p.photos, p.id);
+  }
+
+  function slimValue(value) {
+    if (typeof value === "string") return isDataUrl(value) ? "" : value;
+    if (!value || typeof value !== "object") return value;
+    if (Array.isArray(value)) return value.map(slimValue);
+    const out = {};
+    Object.keys(value).forEach((k) => {
+      out[k] = k === "pendingBots" ? {} : slimValue(value[k]);
+    });
+    return out;
+  }
+
+  function dropLocalBoard() {
+    try {
+      localStorage.removeItem(STATE_KEY);
+    } catch (_) {}
+    try {
+      localStorage.removeItem(LEGACY_KEY);
+    } catch (_) {}
+  }
+
+  async function loadState() {
+    try {
+      const fromIdb = await kvOp("readonly", (store) => store.get("board"));
+      if (fromIdb && typeof fromIdb === "object") return fromIdb;
+    } catch (_) {}
+    return readLocal();
+  }
+
+  async function persist(state) {
+    const slim = slimValue({ ...state, pendingBots: {} });
+    await kvOp("readwrite", (store) => store.put(slim, "board"));
+    dropLocalBoard();
+  }
+
   function writeLocal(state) {
-    const copy = { ...state, pendingBots: {} };
-    localStorage.setItem(STATE_KEY, JSON.stringify(copy));
+    persist(state).catch(() => {});
+  }
+
+  async function clearBoard() {
+    photoCache.clear();
+    dropLocalBoard();
+    try {
+      await photoOp("readwrite", (store) => store.clear());
+    } catch (_) {}
+    try {
+      await kvOp("readwrite", (store) => store.clear());
+    } catch (_) {}
   }
 
   global.latchStorage = {
@@ -236,6 +427,13 @@
     pullBoard,
     pushBoard,
     readLocal,
-    writeLocal
+    loadState,
+    writeLocal,
+    clearBoard,
+    keepPhoto,
+    resolvePhoto,
+    hydratePhotos,
+    parkInlinePhotos,
+    offloadPhotos
   };
 })(window);

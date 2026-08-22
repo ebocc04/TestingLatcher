@@ -81,7 +81,7 @@ function emptyState() {
     tweaks: {},
     customProfiles: [],
     unmatched: [],
-    github: defaultGithub(),
+    github: { ...defaultGithub(), photoShas: {} },
     updatedAt: 0
   };
 }
@@ -92,7 +92,8 @@ function migrate(raw) {
   while (s.user.photos.length < 6) s.user.photos.push("");
   s.user.photos = s.user.photos.slice(0, 6);
   s.github = { ...defaultGithub(), ...(raw.github || {}) };
-  if (!s.github.owner || !s.github.repo) s.github = { ...latchStorage.inferTarget(), sha: s.github.sha || null };
+  if (!s.github.owner || !s.github.repo) s.github = { ...latchStorage.inferTarget(), sha: s.github.sha || null, photoShas: s.github.photoShas || {} };
+  s.github.photoShas = s.github.photoShas || {};
   s.pendingBots = {};
   s.tweaks = raw.tweaks || {};
   s.customProfiles = Array.isArray(raw.customProfiles) ? raw.customProfiles : [];
@@ -101,7 +102,7 @@ function migrate(raw) {
   return s;
 }
 
-let state = migrate(latchStorage.readLocal() || emptyState());
+let state = emptyState();
 let onboardStep = 0;
 let saveTimer = null;
 let ghBusy = false;
@@ -120,18 +121,20 @@ function boardPayload() {
   return {
     ...rest,
     pendingBots: {},
-    github: { owner: github.owner, repo: github.repo, branch: github.branch, path: github.path },
+    github: {
+      owner: github.owner,
+      repo: github.repo,
+      branch: github.branch,
+      path: github.path,
+      photoShas: github.photoShas || {}
+    },
     updatedAt: Date.now()
   };
 }
 
 function save(opts = {}) {
   state.updatedAt = Date.now();
-  try {
-    latchStorage.writeLocal(state);
-  } catch (_) {
-    toast("Couldn't save locally — try smaller photos.");
-  }
+  latchStorage.writeLocal(state);
   if (opts.skipRemote) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => syncToGithub().catch(() => {}), 900);
@@ -151,6 +154,8 @@ async function syncToGithub() {
   ghBusy = true;
   setGhStatus("Saving to GitHub…");
   try {
+    setGhStatus("Saving photos…");
+    await latchStorage.offloadPhotos(state, g);
     const sha = await latchStorage.pushBoard(g, boardPayload(), g.sha);
     if (sha) state.github.sha = sha;
     latchStorage.writeLocal(state);
@@ -176,7 +181,9 @@ async function loadFromGithub() {
     if (remote.data && (remote.data.updatedAt || 0) >= (state.updatedAt || 0)) {
       const keepGh = { ...state.github, sha: remote.sha };
       state = migrate(remote.data);
-      state.github = keepGh;
+      state.github = { ...keepGh, photoShas: { ...(remote.data.github && remote.data.github.photoShas), ...keepGh.photoShas } };
+      await latchStorage.hydratePhotos(state);
+      await latchStorage.parkInlinePhotos(state);
       latchStorage.writeLocal(state);
       toast("Loaded your board from GitHub");
     }
@@ -325,7 +332,7 @@ function titles() {
 }
 
 function photoUrl(p, i) {
-  return p.photos[i] || p.photos[0];
+  return latchStorage.resolvePhoto(p.photos[i] || p.photos[0]);
 }
 
 function userPhotos() {
@@ -336,7 +343,7 @@ async function onPhotoFile(file, index, after) {
   if (!file) return;
   try {
     const data = await latchStorage.compressImage(file);
-    state.user.photos[index] = data;
+    state.user.photos[index] = await latchStorage.keepPhoto(data, `user-${index}`);
     save();
     after();
   } catch (_) {
@@ -348,7 +355,7 @@ function photoGridHtml(prefix) {
   return `<div class="photo-row six">${[0, 1, 2, 3, 4, 5]
     .map(
       (i) => `<div class="photo-slot">
-        ${state.user.photos[i] ? `<img src="${esc(state.user.photos[i])}" alt="" />` : ""}
+        ${state.user.photos[i] ? `<img src="${esc(latchStorage.resolvePhoto(state.user.photos[i]))}" alt="" />` : ""}
         <label>${state.user.photos[i] ? "Change" : "Add"}<input type="file" accept="image/*" data-photo="${i}" data-photo-prefix="${prefix}" /></label>
       </div>`
     )
@@ -369,7 +376,7 @@ function profileArticleHtml(p) {
         .map(
           (src, i) => `
         <div class="media">
-          <img src="${esc(src)}" alt="${esc(p.name)}" />
+          <img src="${esc(latchStorage.resolvePhoto(src))}" alt="${esc(p.name)}" />
           ${
             i === 0
               ? `<div class="media-meta"><h2>${esc(p.name)}, ${p.age}</h2>
@@ -643,7 +650,7 @@ function githubFieldsHtml() {
   const connected = Boolean(token && g.owner && g.repo);
   return `<div class="prompt-card">
     <p class="q">Connect GitHub</p>
-    <p class="muted" style="margin:0 0 12px">Paste a token. This site already knows it saves to <b>${esc(g.owner)}/${esc(g.repo)}</b> — you don't enter a repo name.</p>
+    <p class="muted" style="margin:0 0 12px">Paste a token. This site already knows it saves to <b>${esc(g.owner)}/${esc(g.repo)}</b>. Photos go in <b>data/photos/</b>, so the board stays small no matter how many profiles you add.</p>
     <label class="stack">Token
       <input class="field" type="password" id="gh-token" value="${esc(token)}" placeholder="Paste token" autocomplete="off" />
     </label>
@@ -771,13 +778,19 @@ async function connectGithub() {
   setGhStatus("Connecting…");
   try {
     const result = await latchStorage.connect(token);
-    state.github = { ...result.target, sha: result.board?.sha || null };
+    state.github = {
+      ...result.target,
+      sha: result.board?.sha || null,
+      photoShas: { ...(state.github.photoShas || {}), ...((result.target && result.target.photoShas) || {}) }
+    };
     save({ skipRemote: true });
     if (result.board && !result.board.missing && result.board.data) {
       const keepGh = { ...state.github };
       if ((result.board.data.updatedAt || 0) >= (state.updatedAt || 0)) {
         state = migrate(result.board.data);
-        state.github = keepGh;
+        state.github = { ...keepGh, photoShas: { ...((result.board.data.github || {}).photoShas || {}), ...keepGh.photoShas } };
+        await latchStorage.hydratePhotos(state);
+        await latchStorage.parkInlinePhotos(state);
         latchStorage.writeLocal(state);
       }
     }
@@ -810,7 +823,7 @@ function renderProfile() {
   root.innerHTML = `
     <div class="editor">
       ${photoGridHtml("profile")}
-      <p class="muted" style="margin:0;font-size:.85rem">Photos are compressed and stored with your board (browser + optional GitHub file).</p>
+      <p class="muted" style="margin:0;font-size:.85rem">Photos live in IndexedDB here and as separate files on GitHub — not inside board.json — so you can add as many profiles as you want.</p>
       <label class="stack">First name<input class="field" data-f="name" value="${esc(u.name)}" /></label>
       <label class="stack">Age<input class="field" type="number" min="18" max="99" data-f="age" value="${esc(u.age)}" /></label>
       <label class="stack">I am
@@ -946,9 +959,10 @@ function confirmReset(mode) {
   modal.onclick = (e) => {
     if (e.target === modal) closeModal();
   };
-  $("do-reset").onclick = () => {
-    const user = keep ? JSON.parse(JSON.stringify(state.user)) : null;
+  $("do-reset").onclick = async () => {
+    const user = keep ? { ...state.user, photos: [...(state.user.photos || [])] } : null;
     const github = { ...state.github };
+    if (!keep) await latchStorage.clearBoard();
     state = migrate({ ...emptyState(), github });
     if (keep) {
       state.user = user;
@@ -1153,7 +1167,7 @@ function addPhotoPreviewHtml(photos) {
   return `<div class="photo-row six">${[0, 1, 2, 3, 4, 5]
     .map(
       (i) => `<div class="photo-slot">
-        ${photos[i] ? `<img src="${esc(photos[i])}" alt="" />` : ""}
+        ${photos[i] ? `<img src="${esc(latchStorage.resolvePhoto(photos[i]))}" alt="" />` : ""}
         <label>${photos[i] ? "Change" : "Add"}<input type="file" accept="image/*" data-add-photo="${i}" /></label>
       </div>`
     )
@@ -1230,7 +1244,10 @@ function openAddProfile() {
       el.onchange = async () => {
         if (!el.files[0]) return;
         try {
-          draft.photos[Number(el.dataset.addPhoto)] = await latchStorage.compressImage(el.files[0], 560, 0.62);
+          draft.photos[Number(el.dataset.addPhoto)] = await latchStorage.keepPhoto(
+            await latchStorage.compressImage(el.files[0], 560, 0.62),
+            `${draft.id}-${el.dataset.addPhoto}`
+          );
           read();
           paint("Photo added.");
         } catch (_) {
@@ -1246,9 +1263,9 @@ function openAddProfile() {
       status.textContent = "Pulling photos…";
       try {
         const got = await pullInstagramPhotos(draft.instagram);
-        got.photos.forEach((src, i) => {
-          draft.photos[i] = src;
-        });
+        for (let i = 0; i < got.photos.length; i += 1) {
+          draft.photos[i] = await latchStorage.keepPhoto(got.photos[i], `${draft.id}-${i}`);
+        }
         if (got.handle && !draft.name) draft.name = handleToName(got.handle);
         paint(
           got.note
@@ -1270,7 +1287,7 @@ function openAddProfile() {
         const slot = draft.photos.findIndex((x) => !x);
         if (slot < 0) break;
         try {
-          draft.photos[slot] = await latchStorage.compressImageUrl(src);
+          draft.photos[slot] = await latchStorage.keepPhoto(await latchStorage.compressImageUrl(src), `${draft.id}-${slot}`);
         } catch (_) {
           toast(`Couldn't load ${src.slice(0, 32)}…`);
         }
@@ -1879,19 +1896,26 @@ function render() {
   else if (state.view === "profile") renderProfile();
 }
 
-try {
-  renderOnboard();
-  if (state.onboarded) {
-    render();
-    loadFromGithub();
-  }
-} catch (err) {
-  console.error(err);
+(async () => {
   try {
-    render();
-  } catch (_) {}
-  toast(err.message || "Reload the page — the last update broke the script.");
-}
+    const raw = await latchStorage.loadState();
+    state = migrate(raw || emptyState());
+    await latchStorage.hydratePhotos(state);
+    await latchStorage.parkInlinePhotos(state);
+    latchStorage.writeLocal(state);
+    renderOnboard();
+    if (state.onboarded) {
+      render();
+      loadFromGithub();
+    }
+  } catch (err) {
+    console.error(err);
+    try {
+      render();
+    } catch (_) {}
+    toast(err.message || "Reload the page — the last update broke the script.");
+  }
+})();
 window.addEventListener("resize", () => {
   if (state.view === "messages" || state.view === "chat") render();
 });

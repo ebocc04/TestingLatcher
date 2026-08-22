@@ -1,3 +1,3 @@
-This folder holds `board.json` once you connect a GitHub token in Latch.
+This folder holds `board.json` and `photos/` once you connect a GitHub token in Latch.
 
-Do not put personal access tokens in this directory.
+Photos are stored as separate files so the board stays small. Do not put personal access tokens in this directory.

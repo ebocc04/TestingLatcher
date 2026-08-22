@@ -21,7 +21,7 @@ The app always writes to `localStorage`. To keep the same board on this site:
 
 The token stays in your browser. It is never written into `board.json`.
 
-Photos are compressed to JPEG before save so the Contents API stays under size limits.
+Photos are kept in IndexedDB in the browser and uploaded as separate files under `data/photos/`. `board.json` only stores paths, so you can add as many profiles as you want.
 
 ## Chat
 
