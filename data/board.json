@@ -33,138 +33,18 @@
       }
     ]
   },
-  "onboarded": true,
-  "view": "profile",
+  "onboarded": false,
+  "view": "discover",
   "chatId": null,
-  "skipped": [
-    "avery",
-    "hana"
-  ],
-  "liked": [
-    "nina"
-  ],
-  "matches": [
-    "sofia",
-    "sasha",
-    "maya"
-  ],
-  "roses": 3,
-  "threads": {
-    "maya": [
-      {
-        "from": "them",
-        "text": "Your hiking prompt — same, but I bring better snacks.",
-        "ts": 1787359364759
-      },
-      {
-        "from": "me",
-        "text": "You’ll bring snacks huh? Are you the snack?",
-        "ts": 1787359387238
-      },
-      {
-        "from": "them",
-        "text": "Depends. I pack well — and yes, I heard what I just said.",
-        "ts": 1787359388827
-      },
-      {
-        "from": "them",
-        "text": "If we go, you're carrying the bag. That's the tax on that line.",
-        "ts": 1787359390763
-      },
-      {
-        "from": "me",
-        "text": "So… are you the snack? You look gorgeous",
-        "ts": 1787359459190
-      },
-      {
-        "from": "them",
-        "text": "I said better snacks, not that I'd be the trail dessert. I'm also not *not* saying that.",
-        "ts": 1787359460358
-      },
-      {
-        "from": "them",
-        "text": "So: actual hike, or do you only flirt about the outdoors?",
-        "ts": 1787359461726
-      },
-      {
-        "from": "me",
-        "text": "Well I’d love to say I’m a big outdoor chick but I’m really just the biggest flirt. Is that an issue?",
-        "ts": 1787359496744
-      },
-      {
-        "from": "them",
-        "text": "Okay you're the hiking and the bit. I'll allow it.",
-        "ts": 1787359498166
-      },
-      {
-        "from": "them",
-        "text": "Greenbelt this weekend? I'll bring real food too, don't worry.",
-        "ts": 1787359499830
-      },
-      {
-        "from": "me",
-        "text": "So a date?",
-        "ts": 1787359515331
-      },
-      {
-        "from": "them",
-        "text": "Don't make me like you this fast. What does a good Thursday look like for you?",
-        "ts": 1787359516138
-      }
-    ],
-    "sasha": [
-      {
-        "from": "them",
-        "text": "Hi. Your profile didn't feel like a pitch deck. Relief.",
-        "ts": 1787362407080
-      },
-      {
-        "from": "me",
-        "text": "You’re gorgeous",
-        "ts": 1787362419700
-      },
-      {
-        "from": "them",
-        "text": "Smooth. I'm choosing to be charmed.",
-        "ts": 1787362421636
-      },
-      {
-        "from": "them",
-        "text": "What does a good Tuesday look like for you?",
-        "ts": 1787362423619
-      },
-      {
-        "from": "me",
-        "text": "Idk what’s a good Tuesday look for you?",
-        "ts": 1787362598088
-      },
-      {
-        "from": "them",
-        "text": "Tuesday it is. 🙂",
-        "ts": 1787362599776
-      },
-      {
-        "from": "them",
-        "text": "A wine bar near me that isn't trying too hard. Around 7 — I'll grab the table.",
-        "ts": 1787362602508
-      }
-    ],
-    "sofia": [
-      {
-        "from": "them",
-        "text": "Hey. Your prompts felt written by a person, not a brand.",
-        "ts": 1787362542061
-      }
-    ]
-  },
-  "unread": {
-    "maya": false,
-    "sasha": false,
-    "sofia": false
-  },
+  "skipped": [],
+  "liked": [],
+  "matches": [],
+  "roses": 5,
+  "threads": {},
+  "unread": {},
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787363876869,
+  "updatedAt": 1787363887053,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
