@@ -40,7 +40,8 @@
     "hana"
   ],
   "liked": [
-    "nina"
+    "nina",
+    "sasha"
   ],
   "matches": [],
   "roses": 5,
@@ -67,7 +68,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787364630229,
+  "updatedAt": 1787364635233,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
