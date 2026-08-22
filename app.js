@@ -1009,6 +1009,26 @@ function extractPhotoUrls(html) {
   return urls.slice(0, 6);
 }
 
+function handleToName(handle) {
+  const s = String(handle || "")
+    .replace(/^@/, "")
+    .replace(/_+$/g, "")
+    .replace(/[._]+/g, " ")
+    .trim();
+  if (!s) return "";
+  return s.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+}
+
+async function avatarFromHandle(handle) {
+  if (!handle) return "";
+  const src = `https://unavatar.io/instagram/${encodeURIComponent(handle)}?fallback=false`;
+  try {
+    return await latchStorage.compressImageUrl(src);
+  } catch (_) {
+    return "";
+  }
+}
+
 async function fetchPageText(url) {
   const proxies = [
     (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
@@ -1029,7 +1049,12 @@ async function fetchPageText(url) {
       last = err.message;
     }
   }
-  throw new Error(last || "Couldn't reach Instagram from the browser.");
+  const blocked = /403|401|429/.test(last);
+  throw new Error(
+    blocked
+      ? "Instagram blocked the page (403). They don't let a website read a profile grid."
+      : last || "Couldn't reach Instagram from the browser."
+  );
 }
 
 async function pullInstagramPhotos(input) {
@@ -1039,19 +1064,23 @@ async function pullInstagramPhotos(input) {
     const data = await latchStorage.compressImageUrl(parsed.url);
     return { handle: "", photos: [data] };
   }
-  const html = await fetchPageText(parsed.page);
-  const found = extractPhotoUrls(html);
   const photos = [];
-  for (const src of found) {
-    if (photos.length >= 6) break;
-    try {
-      photos.push(await latchStorage.compressImageUrl(src));
-    } catch (_) {}
+  const pic = await avatarFromHandle(parsed.handle);
+  if (pic) photos.push(pic);
+  try {
+    const html = await fetchPageText(parsed.page);
+    for (const src of extractPhotoUrls(html)) {
+      if (photos.length >= 6) break;
+      try {
+        photos.push(await latchStorage.compressImageUrl(src));
+      } catch (_) {}
+    }
+  } catch (err) {
+    if (!photos.length) throw err;
+    return { handle: parsed.handle || "", photos, note: err.message };
   }
   if (!photos.length) {
-    throw new Error(
-      "Instagram blocked the grab. Open the profile, copy image addresses, or upload shots below."
-    );
+    throw new Error("Instagram blocked the grid. Upload shots or paste image URLs below.");
   }
   return { handle: parsed.handle || "", photos };
 }
@@ -1120,7 +1149,7 @@ function openAddProfile() {
         <strong>Add a profile</strong>
       </div>
       <div class="sheet-scroll admin-form">
-        <p class="muted">Paste an Instagram profile or post. The browser will try to pull public photos. Instagram often blocks that — if it fails, upload shots or paste image URLs.</p>
+        <p class="muted">A profile link usually 403s — Instagram won't let a website read the grid. Grab still fills the name and tries the public profile photo. Upload the rest, or paste image addresses.</p>
         <label>Instagram
           <input id="add-ig" value="${esc(draft.instagram)}" placeholder="https://instagram.com/name or a post link" />
         </label>
@@ -1189,6 +1218,8 @@ function openAddProfile() {
     });
     $("add-grab").onclick = async () => {
       read();
+      const parsed = parseInstagram(draft.instagram);
+      if (parsed && parsed.handle && !draft.name) draft.name = handleToName(parsed.handle);
       const status = $("add-status");
       status.textContent = "Pulling photos…";
       try {
@@ -1196,10 +1227,14 @@ function openAddProfile() {
         got.photos.forEach((src, i) => {
           draft.photos[i] = src;
         });
-        if (got.handle && !draft.name) draft.name = got.handle.replace(/[._]/g, " ");
-        paint(`Got ${got.photos.length} photo${got.photos.length === 1 ? "" : "s"}.`);
+        if (got.handle && !draft.name) draft.name = handleToName(got.handle);
+        paint(
+          got.note
+            ? `${got.note} Got the profile photo — add the rest below.`
+            : `Got ${got.photos.length} photo${got.photos.length === 1 ? "" : "s"}.`
+        );
       } catch (err) {
-        status.textContent = err.message;
+        paint(err.message);
         toast(err.message);
       }
     };
