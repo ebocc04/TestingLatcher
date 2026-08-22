@@ -36,7 +36,9 @@
   "onboarded": true,
   "view": "discover",
   "chatId": null,
-  "skipped": [],
+  "skipped": [
+    "hana"
+  ],
   "liked": [
     "nina"
   ],
@@ -65,7 +67,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787364628344,
+  "updatedAt": 1787364630229,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
