@@ -34,17 +34,29 @@
     ]
   },
   "onboarded": true,
-  "view": "discover",
-  "chatId": null,
+  "view": "chat",
+  "chatId": "c-mt3w9f5j",
   "skipped": [
     "c-mt3wdn3p",
     "c-mt3wd2sh"
   ],
   "liked": [],
-  "matches": [],
+  "matches": [
+    "c-mt3w9f5j"
+  ],
   "roses": 5,
-  "threads": {},
-  "unread": {},
+  "threads": {
+    "c-mt3w9f5j": [
+      {
+        "from": "them",
+        "text": "already thinking about you. match me.",
+        "ts": 1787374523642
+      }
+    ]
+  },
+  "unread": {
+    "c-mt3w9f5j": false
+  },
   "tweaks": {},
   "customProfiles": [
     {
@@ -229,7 +241,7 @@
     }
   ],
   "unmatched": [],
-  "updatedAt": 1787374522959,
+  "updatedAt": 1787374524543,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
