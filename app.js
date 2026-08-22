@@ -1822,10 +1822,18 @@ function render() {
   else if (state.view === "profile") renderProfile();
 }
 
-renderOnboard();
-if (state.onboarded) {
-  render();
-  loadFromGithub();
+try {
+  renderOnboard();
+  if (state.onboarded) {
+    render();
+    loadFromGithub();
+  }
+} catch (err) {
+  console.error(err);
+  try {
+    render();
+  } catch (_) {}
+  toast(err.message || "Reload the page — the last update broke the script.");
 }
 window.addEventListener("resize", () => {
   if (state.view === "messages" || state.view === "chat") render();
