@@ -58,6 +58,12 @@
         "from": "me",
         "text": "Hey beautiful",
         "ts": 1787374981964
+      },
+      {
+        "from": "them",
+        "text": "you too, my dear. i look forward to our match!",
+        "ts": 1787374989608,
+        "via": "local"
       }
     ]
   },
@@ -248,7 +254,7 @@
     }
   ],
   "unmatched": [],
-  "updatedAt": 1787374982866,
+  "updatedAt": 1787374990510,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
