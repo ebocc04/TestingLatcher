@@ -34,14 +34,26 @@
     ]
   },
   "onboarded": true,
-  "view": "discover",
-  "chatId": null,
+  "view": "chat",
+  "chatId": "c-mt3vrbcx",
   "skipped": [],
   "liked": [],
-  "matches": [],
+  "matches": [
+    "c-mt3vrbcx"
+  ],
   "roses": 5,
-  "threads": {},
-  "unread": {},
+  "threads": {
+    "c-mt3vrbcx": [
+      {
+        "from": "them",
+        "text": "already thinking about you. match me.",
+        "ts": 1787373108163
+      }
+    ]
+  },
+  "unread": {
+    "c-mt3vrbcx": false
+  },
   "tweaks": {},
   "customProfiles": [
     {
@@ -166,7 +178,7 @@
     }
   ],
   "unmatched": [],
-  "updatedAt": 1787373094041,
+  "updatedAt": 1787373109101,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
