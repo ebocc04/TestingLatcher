@@ -34,19 +34,31 @@
     ]
   },
   "onboarded": true,
-  "view": "profile",
-  "chatId": null,
+  "view": "chat",
+  "chatId": "nina",
   "skipped": [
     "hana"
   ],
   "liked": [],
-  "matches": [],
+  "matches": [
+    "nina"
+  ],
   "roses": 5,
-  "threads": {},
-  "unread": {},
+  "threads": {
+    "nina": [
+      {
+        "from": "them",
+        "text": "Hi hi. If we match I'm legally required to ask your pastry allegiance.",
+        "ts": 1787369492096
+      }
+    ]
+  },
+  "unread": {
+    "nina": false
+  },
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787369487639,
+  "updatedAt": 1787369493001,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
