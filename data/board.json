@@ -48,6 +48,11 @@
         "from": "them",
         "text": "Hi hi. If we match I'm legally required to ask your pastry allegiance.",
         "ts": 1787363902131
+      },
+      {
+        "from": "me",
+        "text": "My pastry allegiance?",
+        "ts": 1787363926697
       }
     ]
   },
@@ -56,7 +61,7 @@
   },
   "tweaks": {},
   "unmatched": [],
-  "updatedAt": 1787363903034,
+  "updatedAt": 1787363927599,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
