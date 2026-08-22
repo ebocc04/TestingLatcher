@@ -98,6 +98,11 @@
         "from": "me",
         "text": "You telling me you never tried?",
         "ts": 1787364010571
+      },
+      {
+        "from": "them",
+        "text": "You pick the dessert. That's a personality test, sorry.",
+        "ts": 1787364013079
       }
     ]
   },
@@ -125,7 +130,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787364011474,
+  "updatedAt": 1787364013984,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
