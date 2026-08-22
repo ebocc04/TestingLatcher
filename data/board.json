@@ -58,6 +58,12 @@
         "from": "me",
         "text": "Hi gorgeous",
         "ts": 1787370707395
+      },
+      {
+        "from": "them",
+        "text": "When's the first chance to grab butter at Ebell?",
+        "ts": 1787370711608,
+        "via": "local"
       }
     ]
   },
@@ -90,7 +96,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787370708297,
+  "updatedAt": 1787370712511,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
