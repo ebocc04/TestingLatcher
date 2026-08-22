@@ -34,8 +34,8 @@
     ]
   },
   "onboarded": true,
-  "view": "chat",
-  "chatId": "sasha",
+  "view": "profile",
+  "chatId": null,
   "skipped": [
     "avery",
     "hana"
@@ -127,10 +127,11 @@
       }
     }
   },
+  "customProfiles": [],
   "unmatched": [
     "nina"
   ],
-  "updatedAt": 1787370758356,
+  "updatedAt": 1787372582248,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
