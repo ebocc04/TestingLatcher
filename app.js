@@ -768,7 +768,7 @@ function githubFieldsHtml() {
   state.github = { ...g, sha: state.github.sha || null };
   const token = latchStorage.getToken();
   const connected = Boolean(token && g.owner && g.repo);
-  const phone = window.latchLLM && latchLLM.isTightDevice();
+  const phone = window.latchLLM && latchLLM.deviceRole() === "phone";
   return `<div class="prompt-card">
     <p class="q">Board sync</p>
     <p class="muted" style="margin:0 0 12px">Same token on <b>Hermes host</b> (computer) and <b>Phone link</b> (phone). Saves the board and photos to <b>${esc(g.owner)}/${esc(g.repo)}</b>.</p>
@@ -782,13 +782,25 @@ function githubFieldsHtml() {
   </div>`;
 }
 
+function roleFieldsHtml() {
+  const role = latchLLM.deviceRole();
+  return `<div class="prompt-card">
+    <p class="q">This device</p>
+    <p class="muted" style="margin:0 0 12px">Pick one. Computers are <b>Hermes host</b>. Phones are <b>Phone link</b>.</p>
+    <div class="choice-col">
+      <button type="button" class="choice ${role === "host" ? "on" : ""}" data-device-role="host">Hermes host — this computer runs the AI</button>
+      <button type="button" class="choice ${role === "phone" ? "on" : ""}" data-device-role="phone">Phone link — this phone asks the computer</button>
+    </div>
+  </div>`;
+}
+
 function llmFieldsHtml() {
   const cfg = latchLLM.config();
   const key = latchLLM.getKey();
   const on = latchLLM.active();
   const spec = latchLLM.providers[cfg.provider];
   const models = llmFieldsHtml.models || spec.curated.concat(cfg.model).filter((v, i, a) => a.indexOf(v) === i);
-  if (latchLLM.isTightDevice()) {
+  if (latchLLM.deviceRole() === "phone") {
     return `<div class="prompt-card">
       <p class="q">Phone link</p>
       <p class="muted" style="margin:0 0 12px">This phone does not run the AI. It asks <b>Hermes host</b> on your computer. Connect <b>Board sync</b> above, then leave Latch open on the PC.</p>
@@ -841,6 +853,16 @@ function setLlmStatus(msg) {
 }
 
 function bindLlm(root) {
+  root.querySelectorAll("[data-device-role]").forEach((btn) => {
+    btn.onclick = () => {
+      latchLLM.setDeviceRole(btn.dataset.deviceRole);
+      startBrainLoop();
+      if (btn.dataset.deviceRole === "host" && latchLLM.active() && latchLLM.config().provider === "local") {
+        latchLLM.ensureLocal().catch(() => {});
+      }
+      renderProfile();
+    };
+  });
   const keyEl = root.querySelector("#llm-key");
   const modelEl = root.querySelector("#llm-model");
   const provEl = root.querySelector("#llm-provider");
@@ -1018,6 +1040,7 @@ function renderProfile() {
         )
         .join("")}
       ${githubFieldsHtml()}
+      ${roleFieldsHtml()}
       ${llmFieldsHtml()}
       <div class="admin-card">
         <h3>Admin</h3>

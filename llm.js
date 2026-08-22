@@ -61,6 +61,7 @@
   const DESK_MODEL = PROVIDERS.local.defaultModel;
   const OOM_KEY = "latch-llm-oom";
   const LOADING_KEY = "latch-llm-loading";
+  const ROLE_KEY = "latch-device-role";
 
   try {
     const pending = sessionStorage.getItem(LOADING_KEY);
@@ -70,15 +71,28 @@
     }
   } catch (_) {}
 
-  function isTightDevice() {
-    const ua = navigator.userAgent || "";
-    const mobile = /Android|iPhone|iPad|iPod|Mobile|webOS/i.test(ua);
-    const mem = navigator.deviceMemory;
-    let oom = "";
+  function guessPhone() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+  }
+
+  function deviceRole() {
     try {
-      oom = localStorage.getItem(OOM_KEY) || "";
+      const saved = localStorage.getItem(ROLE_KEY);
+      if (saved === "host" || saved === "phone") return saved;
     } catch (_) {}
-    return mobile || (typeof mem === "number" && mem <= 4) || Boolean(oom);
+    return guessPhone() ? "phone" : "host";
+  }
+
+  function setDeviceRole(role) {
+    try {
+      localStorage.setItem(ROLE_KEY, role === "phone" ? "phone" : "host");
+    } catch (_) {}
+    return deviceRole();
+  }
+
+  /* Role is an explicit setting. A past OOM or 4GB RAM must not lock a computer into Phone link. */
+  function isTightDevice() {
+    return deviceRole() === "phone";
   }
 
   function oomModel() {
@@ -539,6 +553,8 @@
     onProgress,
     pickLocalModel,
     isTightDevice,
+    deviceRole,
+    setDeviceRole,
     providers: PROVIDERS,
     get DEFAULT_MODEL() {
       return spec().defaultModel;
