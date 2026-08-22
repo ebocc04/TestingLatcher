@@ -72,6 +72,11 @@
         "text": "We’re on the same page—how about the food truck park on Thursday? I’ll bring the playlist.",
         "ts": 1787369025025,
         "via": "groq"
+      },
+      {
+        "from": "me",
+        "text": "I like that idea, just to confirm… you’re into women right?",
+        "ts": 1787369054691
       }
     ]
   },
@@ -135,7 +140,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369037534,
+  "updatedAt": 1787369055597,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
