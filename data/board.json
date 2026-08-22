@@ -34,14 +34,29 @@
     ]
   },
   "onboarded": true,
-  "view": "discover",
-  "chatId": null,
-  "skipped": [],
+  "view": "chat",
+  "chatId": "sasha",
+  "skipped": [
+    "avery",
+    "hana"
+  ],
   "liked": [],
-  "matches": [],
+  "matches": [
+    "sasha"
+  ],
   "roses": 5,
-  "threads": {},
-  "unread": {},
+  "threads": {
+    "sasha": [
+      {
+        "from": "them",
+        "text": "What are you like on a random Tuesday?",
+        "ts": 1787370723715
+      }
+    ]
+  },
+  "unread": {
+    "sasha": false
+  },
   "tweaks": {
     "nina": {
       "name": "Nina",
@@ -70,7 +85,7 @@
   "unmatched": [
     "nina"
   ],
-  "updatedAt": 1787370721025,
+  "updatedAt": 1787370724617,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
