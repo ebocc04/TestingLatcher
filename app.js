@@ -767,13 +767,14 @@ function queueBotReply(id, userText) {
   const p = profileById(id);
   const thread = state.threads[id] || [];
   const { lines } = latchConverse(p, userText, thread);
-  const queue = (lines || []).filter(Boolean).slice(0, 2);
+  const queue = (lines || []).filter(Boolean).slice(0, 3);
   if (!queue.length) return;
   const sendNext = (i) => {
     state.pendingBots[id] = true;
     save({ skipRemote: true });
     render();
-    const delay = (i === 0 ? 700 : 1100) + Math.random() * 1200;
+    const typing = Math.min(4200, queue[i].length * 28);
+    const delay = (i === 0 ? 800 : 400) + typing + Math.random() * 700;
     setTimeout(() => {
       if (!state.threads[id]) state.threads[id] = [];
       state.threads[id].push({ from: "them", text: queue[i], ts: Date.now() });
