@@ -132,6 +132,12 @@
         "from": "me",
         "text": "Your bed",
         "ts": 1787369154797
+      },
+      {
+        "from": "them",
+        "text": "A cozy bed with a good book—keeps the sweet vibes alive. 🌙",
+        "ts": 1787369158011,
+        "via": "groq"
       }
     ]
   },
@@ -195,7 +201,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369155703,
+  "updatedAt": 1787369158921,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
