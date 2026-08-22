@@ -48,8 +48,6 @@
 
   const inferProvider = (key, saved) => {
     if (saved && PROVIDERS[saved]) return saved;
-    if (/^gsk_/i.test(key || "")) return "groq";
-    if (/^sk-or-/i.test(key || "")) return "openrouter";
     return "local";
   };
 
@@ -96,7 +94,7 @@
   const active = () => {
     const c = config();
     if (c.enabled === false) return false;
-    if (c.provider === "local") return Boolean(c.localReady);
+    if (c.provider === "local") return true;
     return Boolean(getKey());
   };
   const spec = () => PROVIDERS[config().provider] || PROVIDERS.local;

@@ -103,6 +103,14 @@ let state = migrate(latchStorage.readLocal() || emptyState());
 let onboardStep = 0;
 let saveTimer = null;
 let ghBusy = false;
+let llmProgress = "";
+if (window.latchLLM && latchLLM.config().provider !== "local") {
+  latchLLM.setConfig({
+    provider: "local",
+    model: latchLLM.providers.local.defaultModel,
+    enabled: true
+  });
+}
 const $ = (id) => document.getElementById(id);
 
 function boardPayload() {
@@ -557,7 +565,11 @@ function renderChat(root) {
             return `<div class="bubble ${m.from === "me" ? "me" : "them"}">${esc(m.text)}${via}</div>`;
           })
           .join("")}
-        ${state.pendingBots[p.id] ? `<div class="typing">${esc(p.name)} is typing…</div>` : ""}
+        ${
+          state.pendingBots[p.id]
+            ? `<div class="typing">${esc(llmProgress || `${p.name} is typing…`)}</div>`
+            : ""
+        }
       </div>
       <form class="composer" id="composer">
         <input name="text" maxlength="280" placeholder="Send a message" autocomplete="off" />
@@ -1201,18 +1213,39 @@ async function queueBotReply(id, userText) {
   render();
   let lines = null;
   let via = "rules";
-  if (window.latchLLM && latchLLM.active()) {
+  const useModel = window.latchLLM && latchLLM.active();
+  const stopProgress = useModel
+    ? latchLLM.onProgress((text) => {
+        llmProgress = text || "Downloading the free on-device model…";
+        render();
+      })
+    : () => {};
+  if (useModel) {
+    llmProgress = latchLLM.config().provider === "local" ? "Loading Hermes on this device…" : "Thinking…";
+    render();
     try {
       lines = await latchLLM.reply(p, thread, state.user);
-      if (lines && lines.length) via = latchLLM.config().provider || "llm";
+      if (lines && lines.length) {
+        via = latchLLM.config().provider || "llm";
+        if (via === "local") latchLLM.setConfig({ localReady: true });
+      }
     } catch (err) {
       lines = null;
-      toast(`Model failed — built-in reply. ${err.message}`);
+      toast(err.message);
+    } finally {
+      llmProgress = "";
+      stopProgress();
     }
   }
-  if (!lines) {
+  /* Don't paper over a failed on-device load with canned lines — that's the old "random bot" feel. */
+  if (!lines && !(useModel && latchLLM.config().provider === "local")) {
     lines = latchConverse(p, userText, thread, state.user).lines;
     via = "rules";
+  }
+  if (!lines) {
+    state.pendingBots[id] = false;
+    render();
+    return;
   }
 
   const queue = (lines || []).filter(Boolean).slice(0, 3);
