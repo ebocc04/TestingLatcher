@@ -80,6 +80,11 @@
         "from": "me",
         "text": "Yeah so you want to?",
         "ts": 1787364614328
+      },
+      {
+        "from": "them",
+        "text": "A 'quick' pottery class. I made a bowl that is also a metaphor. 🙂",
+        "ts": 1787364617178
       }
     ]
   },
@@ -107,7 +112,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787364615232,
+  "updatedAt": 1787364618084,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
