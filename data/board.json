@@ -56,6 +56,12 @@
         "from": "me",
         "text": "Girl you are gorgeous",
         "ts": 1787374531105
+      },
+      {
+        "from": "them",
+        "text": "thank you, i appreciate the compliment. how are you today?",
+        "ts": 1787374558540,
+        "via": "local"
       }
     ]
   },
@@ -246,7 +252,7 @@
     }
   ],
   "unmatched": [],
-  "updatedAt": 1787374532006,
+  "updatedAt": 1787374559442,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
