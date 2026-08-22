@@ -61,6 +61,11 @@
         "text": "Thanks! What’s your favorite Austin spot for a Tuesday night?",
         "ts": 1787369007575,
         "via": "groq"
+      },
+      {
+        "from": "me",
+        "text": "What about your place? 🤭",
+        "ts": 1787369021062
       }
     ]
   },
@@ -106,7 +111,7 @@
     }
   },
   "unmatched": [],
-  "updatedAt": 1787369008485,
+  "updatedAt": 1787369021968,
   "pendingBots": {},
   "github": {
     "owner": "ebocc04",
